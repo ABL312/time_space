@@ -1,171 +1,204 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #6366f1;
-  --color-primary-light: #818cf8;
-  --color-accent: #f59e0b;
-  --color-accent-light: #fbbf24;
-  --color-surface: #1e293b;
-  --color-surface-light: #334155;
-  --color-bg: #0f172a;
+  /* Deep space palette */
+  --color-primary: #818cf8;
+  --color-primary-light: #a5b4fc;
+  --color-primary-dark: #6366f1;
+
+  /* Signal cyan - dominant accent */
+  --color-signal: #22d3ee;
+  --color-signal-dim: #0891b2;
+  --color-signal-glow: rgba(34, 211, 238, 0.15);
+
+  /* Capsule gold - reserved for capsules */
+  --color-capsule: #f5a623;
+  --color-capsule-dim: #b47d14;
+  --color-capsule-glow: rgba(245, 166, 35, 0.12);
+
+  /* Surfaces - darker, more layered */
+  --color-void: #030712;
+  --color-bg: #0a0f1a;
+  --color-surface: #111827;
+  --color-surface-light: #1f2937;
+  --color-border: rgba(34, 211, 238, 0.08);
+  --color-border-active: rgba(34, 211, 238, 0.25);
+
+  /* Data colors */
+  --color-data-good: #34d399;
+  --color-data-warn: #fbbf24;
+  --color-data-bad: #f87171;
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', monospace;
 }
 
-/* Base dark theme */
 html {
   color-scheme: dark;
 }
 
 body {
-  @apply bg-bg text-white font-sans;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* Mapbox dark theme overrides */
-.mapboxgl-map {
-  border-radius: 0;
-}
-
-.mapboxgl-ctrl-attrib {
-  background-color: rgba(15, 23, 42, 0.7) !important;
-}
-
-.mapboxgl-ctrl-attrib a {
-  color: #94a3b8 !important;
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 6px;
-}
-
-::-webkit-scrollbar-track {
+  font-family: var(--font-sans);
   background: var(--color-bg);
+  color: #e2e8f0;
+  -webkit-font-smoothing: antialiased;
 }
 
-::-webkit-scrollbar-thumb {
-  background: var(--color-surface-light);
-  border-radius: 3px;
+/* ==========================================
+   CORE SYSTEM: Scanline texture overlay
+   ========================================== */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0, 0, 0, 0.03) 2px,
+    rgba(0, 0, 0, 0.03) 4px
+  );
 }
 
-/* Pulse animation for capsule markers */
-@keyframes pulse-glow {
-  0%, 100% {
-    box-shadow: 0 0 8px 2px rgba(245, 158, 11, 0.6);
-    transform: scale(1);
-  }
-  50% {
-    box-shadow: 0 0 20px 6px rgba(245, 158, 11, 0.3);
-    transform: scale(1.1);
-  }
+/* ==========================================
+   CORE SYSTEM: Panel styles
+   ========================================== */
+
+/* Primary panel - thin border, subtle glow */
+.panel {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  position: relative;
 }
 
-.capsule-marker {
-  animation: pulse-glow 2s ease-in-out infinite;
+.panel::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  pointer-events: none;
+  background: linear-gradient(
+    135deg,
+    rgba(34, 211, 238, 0.05) 0%,
+    transparent 50%,
+    rgba(245, 166, 35, 0.03) 100%
+  );
 }
 
-.capsule-marker-recommended {
-  animation: pulse-glow 1.5s ease-in-out infinite;
-  box-shadow: 0 0 12px 4px rgba(245, 158, 11, 0.8);
+/* Glass panel - for overlays on map/camera */
+.hud {
+  background: rgba(10, 15, 26, 0.85);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+  border: 1px solid var(--color-border);
 }
 
-/* Glass morphism for overlays */
-.glass {
-  background: rgba(15, 23, 42, 0.75);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+/* Data readout - for coordinates, timestamps */
+.data {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  letter-spacing: 0.05em;
+  color: #64748b;
 }
 
-/* Envelope unfold animation */
-@keyframes unfold {
+.data-value {
+  font-family: var(--font-mono);
+  color: var(--color-signal);
+}
+
+/* Section label */
+.label {
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #475569;
+}
+
+/* ==========================================
+   SIGNAL: Animations
+   ========================================== */
+
+/* Pulse ring - for capsule markers */
+@keyframes signal-ping {
   0% {
-    transform: rotateX(90deg) scale(0.5);
-    opacity: 0;
-  }
-  50% {
-    transform: rotateX(20deg) scale(0.9);
+    transform: scale(1);
     opacity: 0.8;
   }
   100% {
-    transform: rotateX(0deg) scale(1);
-    opacity: 1;
-  }
-}
-
-.envelope-unfold {
-  animation: unfold 1s ease-out forwards;
-}
-
-/* Float animation for AR capsules */
-@keyframes float {
-  0%, 100% { transform: translateY(0px) rotateY(0deg); }
-  25% { transform: translateY(-8px) rotateY(5deg); }
-  75% { transform: translateY(4px) rotateY(-5deg); }
-}
-
-.float-animation {
-  animation: float 3s ease-in-out infinite;
-}
-
-/* Envelope icon appear animation */
-@keyframes envelope-icon-appear {
-  0% {
-    transform: scale(0) rotate(-30deg);
+    transform: scale(2.5);
     opacity: 0;
   }
-  50% {
-    transform: scale(1.3) rotate(5deg);
-    opacity: 1;
+}
+
+.signal-marker {
+  position: relative;
+}
+
+.signal-marker::before {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border: 1px solid var(--color-capsule);
+  border-radius: 50%;
+  animation: signal-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Breathing glow */
+@keyframes breathe {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+.breathe {
+  animation: breathe 3s ease-in-out infinite;
+}
+
+/* Data stream - for loading states */
+@keyframes data-stream {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--color-surface) 0%,
+    var(--color-surface-light) 50%,
+    var(--color-surface) 100%
+  );
+  background-size: 200% 100%;
+  animation: data-stream 1.8s ease-in-out infinite;
+}
+
+/* Page enter - slide from bottom with fade */
+@keyframes page-in {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
   }
-  100% {
-    transform: scale(1) rotate(0deg);
+  to {
+    transform: translateY(0);
     opacity: 1;
   }
 }
 
-.envelope-icon-appear {
-  animation: envelope-icon-appear 0.6s ease-out forwards;
+.page-in {
+  animation: page-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Emotion tag stagger fade-in */
-@keyframes tag-fade-in {
+/* Element decode - for detail page elements */
+@keyframes decode-in {
   0% {
     opacity: 0;
-    transform: translateY(8px) scale(0.9);
+    filter: blur(8px);
+    transform: translateY(8px);
   }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.tag-stagger {
-  opacity: 0;
-  animation: tag-fade-in 0.4s ease-out forwards;
-}
-
-/* Onboarding card slide-up entrance */
-@keyframes slide-up {
-  0% {
-    opacity: 0;
-    transform: translateY(40px) scale(0.96);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-.onboarding-card {
-  animation: slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-/* Slide up animation for bottom panel */
-@keyframes slide-up-panel {
-  0% {
-    opacity: 0;
-    transform: translateY(100%);
+  60% {
+    filter: blur(0);
   }
   100% {
     opacity: 1;
@@ -173,16 +206,310 @@ body {
   }
 }
 
-.animate-slide-up {
-  animation: slide-up-panel 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+.decode-in {
+  animation: decode-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Recommendation panel styles */
-.recommendation-card {
-  transition: all 0.2s ease;
+/* Staggered children */
+.stagger > * {
+  opacity: 0;
+  animation: decode-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.stagger > *:nth-child(1) { animation-delay: 0.05s; }
+.stagger > *:nth-child(2) { animation-delay: 0.1s; }
+.stagger > *:nth-child(3) { animation-delay: 0.15s; }
+.stagger > *:nth-child(4) { animation-delay: 0.2s; }
+.stagger > *:nth-child(5) { animation-delay: 0.25s; }
+.stagger > *:nth-child(6) { animation-delay: 0.3s; }
+.stagger > *:nth-child(7) { animation-delay: 0.35s; }
+.stagger > *:nth-child(8) { animation-delay: 0.4s; }
+
+/* Panel slide up */
+@keyframes slide-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
 }
 
-.recommendation-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+.slide-up {
+  animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ==========================================
+   INTERACTION: Button & press states
+   ========================================== */
+.btn {
+  transition: all 0.15s ease;
+  position: relative;
+}
+
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), transparent);
+}
+
+.btn:hover::after {
+  opacity: 1;
+}
+
+.btn:active {
+  transform: scale(0.97);
+}
+
+/* Interactive row */
+.row-hover {
+  transition: background 0.15s ease;
+}
+
+.row-hover:hover {
+  background: rgba(34, 211, 238, 0.04);
+}
+
+/* ==========================================
+   COMPONENTS
+   ========================================== */
+
+/* Carousel */
+.carousel-track {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.carousel-track::-webkit-scrollbar { display: none; }
+.carousel-track > * { scroll-snap-align: center; }
+
+/* Waveform */
+@keyframes wave {
+  0%, 100% { height: 3px; }
+  50% { height: 16px; }
+}
+
+.wave-bar {
+  width: 2px;
+  height: 3px;
+  background: var(--color-signal);
+  animation: wave 0.6s ease-in-out infinite;
+}
+.wave-bar:nth-child(2) { animation-delay: 0.08s; }
+.wave-bar:nth-child(3) { animation-delay: 0.16s; }
+.wave-bar:nth-child(4) { animation-delay: 0.24s; }
+.wave-bar:nth-child(5) { animation-delay: 0.12s; }
+.wave-bar:nth-child(6) { animation-delay: 0.2s; }
+
+/* Corner brackets - decorative tech corners */
+.corners {
+  position: relative;
+}
+.corners::before,
+.corners::after {
+  content: '';
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-color: var(--color-signal-dim);
+  opacity: 0.5;
+}
+.corners::before {
+  top: -1px;
+  left: -1px;
+  border-top: 1px solid;
+  border-left: 1px solid;
+}
+.corners::after {
+  bottom: -1px;
+  right: -1px;
+  border-bottom: 1px solid;
+  border-right: 1px solid;
+}
+
+/* Divider line */
+.divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--color-border-active), transparent);
+}
+
+/* ==========================================
+   MAP OVERRIDES
+   ========================================== */
+.mapboxgl-ctrl-attrib {
+  background: rgba(10, 15, 26, 0.8) !important;
+  font-family: var(--font-mono) !important;
+  font-size: 10px !important;
+}
+.mapboxgl-ctrl-attrib a {
+  color: #475569 !important;
+}
+
+/* ==========================================
+   STARFIELD: Deep space background
+   ========================================== */
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 1; }
+}
+
+@keyframes twinkle-slow {
+  0%, 100% { opacity: 0.2; }
+  50% { opacity: 0.8; }
+}
+
+@keyframes star-drift {
+  from { transform: translateY(0); }
+  to { transform: translateY(-100%); }
+}
+
+.starfield {
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 20% 80%, rgba(34, 211, 238, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 20%, rgba(129, 140, 248, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse at 50% 50%, rgba(245, 166, 35, 0.06) 0%, transparent 60%),
+    radial-gradient(ellipse at 35% 30%, rgba(34, 211, 238, 0.05) 0%, transparent 40%),
+    var(--color-void);
+}
+
+/* Layer 1: Dense dim stars */
+.starfield::before {
+  content: '';
+  position: absolute;
+  inset: -50% 0 0 0;
+  width: 100%;
+  height: 200%;
+  background-image:
+    radial-gradient(1px 1px at 3% 7%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 8% 22%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 12% 48%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 17% 11%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 22% 63%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 26% 29%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 31% 82%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 35% 17%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 39% 55%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 43% 91%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 47% 3%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 52% 37%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 56% 73%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 61% 19%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 65% 46%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 69% 86%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 73% 8%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 78% 58%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 82% 31%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 87% 72%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 91% 14%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 96% 43%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 2% 77%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 7% 93%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 14% 41%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 19% 68%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 24% 5%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 29% 52%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 33% 24%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 38% 67%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 44% 39%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 49% 85%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 54% 12%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 58% 61%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 63% 28%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 67% 94%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 72% 47%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 77% 76%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 84% 18%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 89% 54%, rgba(255,255,255,0.7), transparent),
+    radial-gradient(1px 1px at 94% 33%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 98% 66%, rgba(255,255,255,0.5), transparent);
+  animation: star-drift 120s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Layer 2: Bright twinkle stars with colored accents */
+.starfield::after {
+  content: '';
+  position: absolute;
+  inset: -50% 0 0 0;
+  width: 100%;
+  height: 200%;
+  background-image:
+    radial-gradient(2px 2px at 8% 18%, rgba(34, 211, 238, 1), transparent),
+    radial-gradient(2px 2px at 15% 62%, rgba(255, 255, 255, 1), transparent),
+    radial-gradient(1.5px 1.5px at 22% 41%, rgba(245, 166, 35, 0.9), transparent),
+    radial-gradient(2px 2px at 29% 8%, rgba(255, 255, 255, 1), transparent),
+    radial-gradient(1.5px 1.5px at 36% 77%, rgba(129, 140, 248, 0.9), transparent),
+    radial-gradient(2px 2px at 43% 28%, rgba(255, 255, 255, 1), transparent),
+    radial-gradient(1.5px 1.5px at 51% 53%, rgba(34, 211, 238, 0.8), transparent),
+    radial-gradient(2px 2px at 58% 91%, rgba(255, 255, 255, 1), transparent),
+    radial-gradient(1.5px 1.5px at 65% 15%, rgba(245, 166, 35, 0.9), transparent),
+    radial-gradient(2px 2px at 72% 68%, rgba(255, 255, 255, 1), transparent),
+    radial-gradient(1.5px 1.5px at 79% 36%, rgba(129, 140, 248, 0.9), transparent),
+    radial-gradient(2px 2px at 86% 82%, rgba(255, 255, 255, 1), transparent),
+    radial-gradient(1.5px 1.5px at 93% 48%, rgba(34, 211, 238, 0.8), transparent),
+    radial-gradient(2px 2px at 4% 88%, rgba(255, 255, 255, 1), transparent),
+    radial-gradient(1.5px 1.5px at 11% 5%, rgba(245, 166, 35, 0.8), transparent),
+    radial-gradient(2px 2px at 47% 95%, rgba(129, 140, 248, 0.9), transparent),
+    radial-gradient(1.5px 1.5px at 68% 42%, rgba(255, 255, 255, 1), transparent),
+    radial-gradient(2px 2px at 82% 7%, rgba(34, 211, 238, 0.9), transparent);
+  animation: star-drift 80s linear infinite, twinkle 3s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* React-generated star layer (box-shadow technique, dense) */
+.star-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.star-layer-dot {
+  position: absolute;
+  border-radius: 50%;
+  background: white;
+}
+
+.star-layer-dot.twinkle-a { animation: twinkle 2.5s ease-in-out infinite; }
+.star-layer-dot.twinkle-b { animation: twinkle-slow 4s ease-in-out infinite; }
+.star-layer-dot.twinkle-c { animation: twinkle 3.5s ease-in-out infinite; animation-delay: 1s; }
+
+/* Shooting star */
+@keyframes shoot {
+  0% {
+    transform: translateX(0) translateY(0);
+    opacity: 1;
+  }
+  70% { opacity: 1; }
+  100% {
+    transform: translateX(300px) translateY(300px);
+    opacity: 0;
+  }
+}
+
+.shooting-star {
+  position: absolute;
+  width: 80px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(255,255,255,0.8), transparent);
+  transform: rotate(45deg);
+  animation: shoot 1.5s ease-in forwards;
+  pointer-events: none;
+}
+
+/* Content above starfield */
+.starfield > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-light);
+  border-radius: 2px;
 }

@@ -20,8 +20,8 @@ function App() {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-bg">
         <div className="text-center">
-          <div className="text-4xl mb-4">✉️</div>
-          <p className="text-slate-400 text-sm">正在连接时空...</p>
+          <div className="w-3 h-3 bg-signal breathe mx-auto mb-4" />
+          <p className="data text-signal">INITIALIZING</p>
         </div>
       </div>
     )
