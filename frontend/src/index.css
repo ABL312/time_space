@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: #6366f1;
+  --color-primary-light: #818cf8;
+  --color-accent: #f59e0b;
+  --color-accent-light: #fbbf24;
+  --color-surface: #1e293b;
+  --color-surface-light: #334155;
+  --color-bg: #0f172a;
+}
+
+/* Base dark theme */
+html {
+  color-scheme: dark;
+}
+
+body {
+  @apply bg-bg text-white font-sans;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Mapbox dark theme overrides */
+.mapboxgl-map {
+  border-radius: 0;
+}
+
+.mapboxgl-ctrl-attrib {
+  background-color: rgba(15, 23, 42, 0.7) !important;
+}
+
+.mapboxgl-ctrl-attrib a {
+  color: #94a3b8 !important;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-light);
+  border-radius: 3px;
+}
+
+/* Pulse animation for capsule markers */
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 8px 2px rgba(245, 158, 11, 0.6);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 20px 6px rgba(245, 158, 11, 0.3);
+    transform: scale(1.1);
+  }
+}
+
+.capsule-marker {
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.capsule-marker-recommended {
+  animation: pulse-glow 1.5s ease-in-out infinite;
+  box-shadow: 0 0 12px 4px rgba(245, 158, 11, 0.8);
+}
+
+/* Glass morphism for overlays */
+.glass {
+  background: rgba(15, 23, 42, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Envelope unfold animation */
+@keyframes unfold {
+  0% {
+    transform: rotateX(90deg) scale(0.5);
+    opacity: 0;
+  }
+  50% {
+    transform: rotateX(20deg) scale(0.9);
+    opacity: 0.8;
+  }
+  100% {
+    transform: rotateX(0deg) scale(1);
+    opacity: 1;
+  }
+}
+
+.envelope-unfold {
+  animation: unfold 1s ease-out forwards;
+}
+
+/* Float animation for AR capsules */
+@keyframes float {
+  0%, 100% { transform: translateY(0px) rotateY(0deg); }
+  25% { transform: translateY(-8px) rotateY(5deg); }
+  75% { transform: translateY(4px) rotateY(-5deg); }
+}
+
+.float-animation {
+  animation: float 3s ease-in-out infinite;
+}

@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Build outputs
+frontend/dist/
+*.egg-info/
+
+# Environment files
+.env
+.env.local
+.env.production
+backend/.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Uploads (don't commit uploaded files)
+backend/data/uploads/photos/*
+backend/data/uploads/voices/*
+backend/data/uploads/voice_clones/*
+backend/data/uploads/thumbnails/*
+!backend/data/uploads/photos/.gitkeep
+!backend/data/uploads/voices/.gitkeep
+!backend/data/uploads/voice_clones/.gitkeep
+!backend/data/uploads/thumbnails/.gitkeep
+
+# Database
+backend/data/*.db
+backend/data/*.db-wal
+backend/data/*.db-shm
+
+# PWA
+frontend/public/workbox-*.js
+frontend/public/sw.js
+frontend/public/sw.js.map
+
+# Logs
+*.log
