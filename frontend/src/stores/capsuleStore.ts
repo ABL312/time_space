@@ -5,6 +5,12 @@ interface CapsuleState {
   /** Nearby capsules from last query */
   nearby: NearbyResponse | null
 
+  /** Recommended capsules from last query */
+  recommendedCapsules: Capsule[]
+  
+  /** Other capsules from last query */
+  otherCapsules: Capsule[]
+
   /** Currently selected/viewed capsule */
   selectedCapsule: Capsule | null
 
@@ -35,6 +41,8 @@ interface CapsuleState {
 
 export const useCapsuleStore = create<CapsuleState>((set) => ({
   nearby: null,
+  recommendedCapsules: [],
+  otherCapsules: [],
   selectedCapsule: null,
   locationContext: null,
   isLoadingNearby: false,
@@ -52,7 +60,12 @@ export const useCapsuleStore = create<CapsuleState>((set) => ({
       const res = await fetch(`/api/capsules/nearby?${searchParams.toString()}`)
       if (res.ok) {
         const data = await res.json()
-        set({ nearby: data, isLoadingNearby: false })
+        set({ 
+          nearby: data, 
+          recommendedCapsules: data.recommended || [],
+          otherCapsules: data.others || [],
+          isLoadingNearby: false 
+        })
       } else {
         set({ isLoadingNearby: false })
       }

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
-import mapboxgl from 'mapbox-gl'
-import 'mapbox-gl/dist/mapbox-gl.css'
+import mapboxgl from 'mapboxgl'
+import 'mapboxgl/dist/mapboxgl.css'
 import type { Capsule } from '../types'
 
 // TODO: Move to environment variable
@@ -69,10 +69,6 @@ export default function MapView({
     const userMarker = document.createElement('div')
     userMarker.className = 'w-4 h-4 rounded-full bg-blue-500 border-2 border-white shadow-lg shadow-blue-500/50'
 
-    new mapboxgl.Marker({ element: userMarker })
-      .setLngLat([longitude, latitude])
-      .addTo(map.current)
-
     markersRef.current.push(
       new mapboxgl.Marker({ element: userMarker })
         .setLngLat([longitude, latitude])
@@ -84,9 +80,23 @@ export default function MapView({
       const isRecommended = (capsule.match_score ?? 0) > 0.5
 
       const el = document.createElement('div')
-      el.className = isRecommended
-        ? 'capsule-marker-recommended w-4 h-4 rounded-full bg-accent cursor-pointer'
-        : 'capsule-marker w-2.5 h-2.5 rounded-full bg-accent/70 cursor-pointer'
+      
+      // Apply different styling based on recommendation status
+      if (isRecommended) {
+        el.className = 'capsule-marker-recommended w-3.5 h-3.5 rounded-full bg-accent cursor-pointer border-2 border-yellow-300 shadow-lg'
+      } else {
+        el.className = 'capsule-marker w-2 h-2 rounded-full bg-white cursor-pointer border border-blue-300'
+      }
+
+      // Add hover effect
+      el.addEventListener('mouseenter', () => {
+        el.style.transform = 'scale(1.3)'
+        el.style.transition = 'transform 0.2s ease'
+      })
+      
+      el.addEventListener('mouseleave', () => {
+        el.style.transform = 'scale(1)'
+      })
 
       el.addEventListener('click', () => {
         onCapsuleClick?.(capsule)
@@ -95,6 +105,25 @@ export default function MapView({
       const marker = new mapboxgl.Marker({ element: el })
         .setLngLat([capsule.longitude, capsule.latitude])
         .addTo(map.current!)
+
+      // Add label for recommended capsules
+      if (isRecommended) {
+        const popup = new mapboxgl.Popup({
+          offset: 25,
+          closeButton: false,
+          className: 'bg-surface text-white text-xs px-2 py-1 rounded'
+        }).setText('✨ 推荐')
+
+        marker.setPopup(popup)
+        
+        el.addEventListener('mouseenter', () => {
+          marker.togglePopup()
+        })
+        
+        el.addEventListener('mouseleave', () => {
+          marker.togglePopup()
+        })
+      }
 
       markersRef.current.push(marker)
     })

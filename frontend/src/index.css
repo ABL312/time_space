@@ -160,3 +160,19 @@ body {
 .onboarding-card {
   animation: slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* Slide up animation for bottom panel */
+@keyframes slide-up-panel {
+  0% {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up-panel 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
