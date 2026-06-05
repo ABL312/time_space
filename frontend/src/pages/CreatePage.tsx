@@ -110,9 +110,11 @@ export default function CreatePage() {
     } finally {
       setIsCloning(false)
     }
+  }
+
   const canSubmit = message.length >= 10 && message.length <= 500 && latitude && longitude
 
-    const handleSubmit = async () => {
+  const handleSubmit = async () => {
       if (!canSubmit || !latitude || !longitude) return
       if (!user) { setError('请先登录'); return }
       setIsSubmitting(true)
