@@ -107,3 +107,40 @@ body {
 .float-animation {
   animation: float 3s ease-in-out infinite;
 }
+
+/* Envelope icon appear animation */
+@keyframes envelope-icon-appear {
+  0% {
+    transform: scale(0) rotate(-30deg);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.3) rotate(5deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+.envelope-icon-appear {
+  animation: envelope-icon-appear 0.6s ease-out forwards;
+}
+
+/* Emotion tag stagger fade-in */
+@keyframes tag-fade-in {
+  0% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.tag-stagger {
+  opacity: 0;
+  animation: tag-fade-in 0.4s ease-out forwards;
+}
