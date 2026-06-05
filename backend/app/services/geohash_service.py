@@ -59,11 +59,13 @@ async def find_nearby_capsules(
     hashes = get_nearby_hashes(lat, lng, precision)
     placeholders = ",".join(["?" for _ in hashes])
 
+    # Use SUBSTR to match stored geohash at the query precision
+    # (stored hashes are always precision 6, but we may query at lower precision)
     query = f"""
         SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
         FROM capsules c
         LEFT JOIN users u ON c.author_id = u.id
-        WHERE c.geohash IN ({placeholders})
+        WHERE SUBSTR(c.geohash, 1, {precision}) IN ({placeholders})
         AND c.visibility = ?
         ORDER BY c.created_at DESC
         LIMIT ?
