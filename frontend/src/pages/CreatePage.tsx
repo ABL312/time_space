@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGeolocation } from '../hooks/useGeolocation'
 import { useUserStore } from '../stores/userStore'
-import { capsulesApi } from '../lib/api'
+import { capsulesApi, aiApi } from '../lib/api'
 import { EMOTION_TAGS } from '../types'
 
 export default function CreatePage() {
@@ -18,8 +18,16 @@ export default function CreatePage() {
   const [isRecording, setIsRecording] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // Voice clone states
+  const [voiceSampleBlob, setVoiceSampleBlob] = useState<Blob | null>(null)
+  const [isSampleRecording, setIsSampleRecording] = useState(false)
+  const [cloneText, setCloneText] = useState('')
+  const [isCloning, setIsCloning] = useState(false)
+  const [voiceCloneUrl, setVoiceCloneUrl] = useState<string | null>(null)
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const voiceSampleRecorderRef = useRef<MediaRecorder | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const toggleMoodTag = (tag: string) => {
@@ -37,49 +45,94 @@ export default function CreatePage() {
   const removePhoto = (index: number) => setPhotos((prev) => prev.filter((_, i) => i !== index))
 
   const startRecording = useCallback(async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' })
-      const chunks: Blob[] = []
-      mr.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
-      mr.onstop = () => {
-        setVoiceBlob(new Blob(chunks, { type: 'audio/webm' }))
-        stream.getTracks().forEach((t) => t.stop())
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+        const chunks: Blob[] = []
+        mr.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
+        mr.onstop = () => {
+          setVoiceBlob(new Blob(chunks, { type: 'audio/webm' }))
+          stream.getTracks().forEach((t) => t.stop())
+        }
+        mr.start()
+        mediaRecorderRef.current = mr
+        setIsRecording(true)
+        setTimeout(() => { if (mr.state === 'recording') { mr.stop(); setIsRecording(false) } }, 60000)
+      } catch { setError('无法访问麦克风') }
+    }, [])
+
+    const startSampleRecording = useCallback(async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+        const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+        const chunks: Blob[] = []
+        mr.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
+        mr.onstop = () => {
+          setVoiceSampleBlob(new Blob(chunks, { type: 'audio/webm' }))
+          stream.getTracks().forEach((t) => t.stop())
+        }
+        mr.start()
+        voiceSampleRecorderRef.current = mr
+        setIsSampleRecording(true)
+        // 10 second limit for voice sample
+        setTimeout(() => { if (mr.state === 'recording') { mr.stop(); setIsSampleRecording(false) } }, 10000)
+      } catch { setError('无法访问麦克风') }
+    }, [])
+
+    const stopRecording = useCallback(() => {
+      if (mediaRecorderRef.current?.state === 'recording') {
+        mediaRecorderRef.current.stop()
+        setIsRecording(false)
       }
-      mr.start()
-      mediaRecorderRef.current = mr
-      setIsRecording(true)
-      setTimeout(() => { if (mr.state === 'recording') { mr.stop(); setIsRecording(false) } }, 60000)
-    } catch { setError('无法访问麦克风') }
-  }, [])
+    }, [])
 
-  const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current?.state === 'recording') {
-      mediaRecorderRef.current.stop()
-      setIsRecording(false)
+    const stopSampleRecording = useCallback(() => {
+      if (voiceSampleRecorderRef.current?.state === 'recording') {
+        voiceSampleRecorderRef.current.stop()
+        setIsSampleRecording(false)
+      }
+    }, [])
+
+  const handleVoiceClone = async () => {
+    if (!voiceSampleBlob) { 
+      setError('请先录制语音样本')
+      return 
     }
-  }, [])
-
+    
+    setIsCloning(true)
+    setError(null)
+    
+    try {
+      const res = await aiApi.cloneVoice(voiceSampleBlob, cloneText || message)
+      setVoiceCloneUrl(res.audio_url)
+    } catch (err: any) {
+      setError(err.message || '声音克隆失败')
+    } finally {
+      setIsCloning(false)
+    }
   const canSubmit = message.length >= 10 && message.length <= 500 && latitude && longitude
 
-  const handleSubmit = async () => {
-    if (!canSubmit || !latitude || !longitude || !user) return
-    setIsSubmitting(true)
-    setError(null)
-    try {
-      const fd = new FormData()
-      fd.append('message', message)
-      fd.append('latitude', String(latitude))
-      fd.append('longitude', String(longitude))
-      fd.append('visibility', visibility)
-      if (moodTags.length > 0) fd.append('mood_tag', moodTags[0])
-      photos.forEach((p) => fd.append('photos', p))
-      if (voiceBlob) fd.append('voice', voiceBlob, 'recording.webm')
-      await capsulesApi.create(fd)
-      navigate('/')
-    } catch (err: any) { setError(err.message || '创建失败') }
-    finally { setIsSubmitting(false) }
-  }
+    const handleSubmit = async () => {
+      if (!canSubmit || !latitude || !longitude) return
+      if (!user) { setError('请先登录'); return }
+      setIsSubmitting(true)
+      setError(null)
+      try {
+        const fd = new FormData()
+        fd.append('author_id', user.id)
+        fd.append('message', message)
+        fd.append('latitude', String(latitude))
+        fd.append('longitude', String(longitude))
+        fd.append('visibility', visibility)
+        if (moodTags.length > 0) fd.append('mood_tag', moodTags[0])
+        photos.forEach((p) => fd.append('photos', p))
+        if (voiceBlob) fd.append('voice', voiceBlob, 'recording.webm')
+        if (voiceCloneUrl) fd.append('voice_clone_url', voiceCloneUrl)
+        await capsulesApi.create(fd)
+        navigate('/')
+      } catch (err: any) { setError(err.message || '创建失败') }
+      finally { setIsSubmitting(false) }
+    }
 
   return (
     <div className="min-h-screen bg-bg page-in">
@@ -168,27 +221,104 @@ export default function CreatePage() {
         </section>
 
         {/* VOICE */}
-        <section>
-          <div className="label mb-2 flex items-center gap-2">
-            <span className="inline-block w-2 h-px bg-signal-dim" />
-            VOICE_RECORD [optional, max 60s]
-          </div>
-          {voiceBlob ? (
-            <div className="panel p-3 flex items-center gap-3">
-              <audio src={URL.createObjectURL(voiceBlob)} controls className="flex-1 h-8" />
-              <button onClick={() => setVoiceBlob(null)} className="data text-data-bad hover:text-red-300 transition-colors">CLEAR</button>
-            </div>
-          ) : (
-            <button onClick={isRecording ? stopRecording : startRecording}
-              className={`btn w-full py-3 border text-xs font-mono tracking-wider transition-all ${
-                isRecording
-                  ? 'border-data-bad/30 bg-data-bad/5 text-data-bad'
-                  : 'border-border bg-surface/50 text-slate-400 hover:border-surface-light'
-              }`}>
-              {isRecording ? 'STOP RECORDING' : 'START RECORDING'}
-            </button>
-          )}
-        </section>
+                <section>
+                  <div className="label mb-2 flex items-center gap-2">
+                    <span className="inline-block w-2 h-px bg-signal-dim" />
+                    VOICE_RECORD [optional, max 60s]
+                  </div>
+                  {voiceBlob ? (
+                    <div className="panel p-3 flex items-center gap-3">
+                      <audio src={URL.createObjectURL(voiceBlob)} controls className="flex-1 h-8" />
+                      <button onClick={() => setVoiceBlob(null)} className="data text-data-bad hover:text-red-300 transition-colors">CLEAR</button>
+                    </div>
+                  ) : (
+                    <button onClick={isRecording ? stopRecording : startRecording}
+                      className={`btn w-full py-3 border text-xs font-mono tracking-wider transition-all ${
+                        isRecording
+                          ? 'border-data-bad/30 bg-data-bad/5 text-data-bad'
+                          : 'border-border bg-surface/50 text-slate-400 hover:border-surface-light'
+                      }`}>
+                      {isRecording ? 'STOP RECORDING' : 'START RECORDING'}
+                    </button>
+                  )}
+                </section>
+
+                {/* VOICE CLONE */}
+                <section>
+                  <div className="label mb-2 flex items-center gap-2">
+                    <span className="inline-block w-2 h-px bg-signal-dim" />
+                    AI_VOICE_CLONE [optional]
+                  </div>
+                  <div className="panel p-4 space-y-4">
+                    <p className="text-sm text-slate-400">上传 10 秒语音样本，AI 将用你的声音朗读留言</p>
+            
+                    {/* Sample Recording */}
+                    <div>
+                      <div className="label mb-2">语音样本录制 [10秒]</div>
+                      {voiceSampleBlob ? (
+                        <div className="flex items-center gap-3">
+                          <audio src={URL.createObjectURL(voiceSampleBlob)} controls className="flex-1 h-8" />
+                          <button 
+                            onClick={() => setVoiceSampleBlob(null)}
+                            className="data text-data-bad hover:text-red-300 transition-colors"
+                          >
+                            CLEAR
+                          </button>
+                        </div>
+                      ) : (
+                        <button 
+                          onClick={isSampleRecording ? stopSampleRecording : startSampleRecording}
+                          className={`btn w-full py-3 border text-xs font-mono tracking-wider transition-all ${
+                            isSampleRecording
+                              ? 'border-data-bad/30 bg-data-bad/5 text-data-bad'
+                              : 'border-border bg-surface/50 text-slate-400 hover:border-surface-light'
+                          }`}
+                        >
+                          {isSampleRecording ? 'STOP RECORDING' : 'START RECORDING'}
+                        </button>
+                      )}
+                    </div>
+            
+                    {/* Text Input */}
+                    <div>
+                      <div className="label mb-2">朗读文本</div>
+                      <textarea
+                        value={cloneText}
+                        onChange={(e) => setCloneText(e.target.value)}
+                        placeholder={message || "输入要朗读的文字..."}
+                        maxLength={500}
+                        rows={3}
+                        className="w-full px-3 py-2 bg-surface border border-border text-white placeholder-slate-600 focus:outline-none focus:border-signal transition-colors resize-none text-sm"
+                      />
+                    </div>
+            
+                    {/* Generate Button */}
+                    <button
+                      onClick={handleVoiceClone}
+                      disabled={!voiceSampleBlob || isCloning}
+                      className={`btn w-full py-2.5 text-xs font-mono tracking-wider border transition-all ${
+                        voiceSampleBlob && !isCloning
+                          ? 'border-primary/40 bg-primary/5 text-primary-light hover:bg-primary/10'
+                          : 'border-border text-slate-600 cursor-not-allowed'
+                      }`}
+                    >
+                      {isCloning ? 'GENERATING...' : 'GENERATE CLONED VOICE'}
+                    </button>
+            
+                    {/* Preview */}
+                    {voiceCloneUrl && (
+                      <div className="pt-2 border-t border-border">
+                        <div className="label mb-2">预览</div>
+                        <audio src={voiceCloneUrl} controls className="w-full" />
+                      </div>
+                    )}
+            
+                    {/* Error */}
+                    {error && !message.includes(error) && (
+                      <p className="data text-data-bad text-center">{error}</p>
+                    )}
+                  </div>
+                </section>
 
         {/* MOOD TAGS */}
         <section>
