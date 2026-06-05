@@ -8,7 +8,7 @@ import type { Capsule } from '../types'
 
 export default function HomePage() {
   const navigate = useNavigate()
-  const { latitude, longitude, error: geoError } = useGeolocation()
+  const { latitude, longitude, accuracy, error: geoError } = useGeolocation()
   const { user } = useUserStore()
   const { fetchNearby, nearby, recommendedCapsules, otherCapsules, isLoadingNearby } = useCapsuleStore()
   const [isRefreshing, setIsRefreshing] = useState(false)
@@ -16,14 +16,20 @@ export default function HomePage() {
   // Fetch nearby capsules when location is available
   useEffect(() => {
     if (latitude && longitude && user) {
+      // Check accuracy and adjust radius if needed
+      let radius = 1200;
+      if (accuracy && accuracy > 50) {
+        radius = 2000; // Expand search radius for poor GPS signal
+      }
+      
       fetchNearby({
         lat: latitude,
         lng: longitude,
-        radius: 1200,
+        radius: radius,
         user_id: user.id,
       })
     }
-  }, [latitude, longitude, user, fetchNearby])
+  }, [latitude, longitude, user, fetchNearby, accuracy])
 
   const handleRefreshNearby = async () => {
     if (latitude && longitude && user) {
@@ -230,15 +236,16 @@ export default function HomePage() {
       </div>
 
       {/* GPS error toast */}
-      {geoError && (
+      {(geoError || (accuracy && accuracy > 50)) && (
         <div className="absolute top-4 left-4 right-4 glass rounded-lg p-3 text-xs text-amber-400">
-          ⚠️ {geoError}
+          ⚠️ {geoError || `📡 GPS 信号较弱 (精度: ${Math.round(accuracy || 0)}m)，搜索范围已扩大`}
         </div>
       )}
 
       {/* Loading indicator */}
       {(isLoadingNearby || isRefreshing) && (
-        <div className="absolute top-4 right-4 glass rounded-full px-3 py-1.5 text-xs text-slate-300">
+        <div className="absolute top-4 right-4 glass rounded-full px-3 py-1.5 text-xs text-slate-300 flex items-center">
+          <div className="envelope-loader mr-2"></div>
           加载中...
         </div>
       )}

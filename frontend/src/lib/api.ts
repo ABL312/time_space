@@ -10,26 +10,45 @@ import type {
 const BASE_URL = '/api'
 
 // ==========================================
-// Generic fetch wrapper
+// Generic fetch wrapper with timeout
 // ==========================================
 async function request<T>(
   url: string,
-  options?: RequestInit
+  options?: RequestInit,
+  timeoutMs: number = 5000
 ): Promise<T> {
-  const res = await fetch(`${BASE_URL}${url}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options?.headers,
-    },
-    ...options,
-  })
-
-  if (!res.ok) {
-    const error = await res.json().catch(() => ({ detail: res.statusText }))
-    throw new Error(error.detail || `HTTP ${res.status}`)
+  // Create AbortController for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  
+  try {
+    const res = await fetch(`${BASE_URL}${url}`, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options?.headers,
+      },
+      ...options,
+      signal: controller.signal,
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(error.detail || `HTTP ${res.status}`);
+    }
+    
+    return res.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    
+    // Handle timeout specifically
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new Error('请求超时，请检查网络连接后重试');
+    }
+    
+    throw error;
   }
-
-  return res.json()
 }
 
 // ==========================================
@@ -87,12 +106,12 @@ export const capsulesApi = {
     searchParams.set('lng', String(params.lng))
     if (params.radius) searchParams.set('radius', String(params.radius))
     if (params.user_id) searchParams.set('user_id', params.user_id)
-    return request(`/capsules/nearby?${searchParams.toString()}`)
+    return request(`/capsules/nearby?${searchParams.toString()}`, undefined, 5000)
   },
 
   /** Get capsule detail */
   getById(id: string): Promise<Capsule> {
-    return request(`/capsules/${id}`)
+    return request(`/capsules/${id}`, undefined, 5000)
   },
 
   /** Reply to a capsule */
@@ -118,12 +137,12 @@ export const aiApi = {
     return request('/ai/analyze-emotion', {
       method: 'POST',
       body: JSON.stringify({ message }),
-    })
+    }, 5000)
   },
 
   /** Get location context from GPS */
   getLocationContext(lat: number, lng: number): Promise<LocationContext> {
-    return request(`/ai/location-context?lat=${lat}&lng=${lng}`)
+    return request(`/ai/location-context?lat=${lat}&lng=${lng}`, undefined, 5000)
   },
 
   /** Recognize scene from camera frame */
@@ -163,5 +182,5 @@ export const aiApi = {
 // Health check
 // ==========================================
 export function healthCheck(): Promise<{ status: string }> {
-  return request('/health')
+  return request('/health', undefined, 5000)
 }

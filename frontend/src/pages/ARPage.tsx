@@ -4,6 +4,8 @@ import { useGeolocation } from '../hooks/useGeolocation'
 import { useOrientation } from '../hooks/useOrientation'
 import { useCapsuleStore } from '../stores/capsuleStore'
 import ARScene from '../components/ARScene'
+import ErrorBoundary from '../components/ErrorBoundary'
+import FallbackARView from '../components/FallbackARView'
 
 export default function ARPage() {
   const navigate = useNavigate()
@@ -13,6 +15,7 @@ export default function ARPage() {
   const { nearby, fetchNearby } = useCapsuleStore()
   const [cameraReady, setCameraReady] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
+  const [webglSupported, setWebglSupported] = useState<boolean>(true)
 
   // Start camera feed
   useEffect(() => {
@@ -20,6 +23,12 @@ export default function ARPage() {
 
     async function startCamera() {
       try {
+        // Check if getUserMedia is available
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          setCameraError('设备不支持摄像头功能')
+          return
+        }
+        
         stream = await navigator.mediaDevices.getUserMedia({
           video: { facingMode: 'environment' },
           audio: false,
@@ -30,7 +39,8 @@ export default function ARPage() {
             setCameraReady(true)
           }
         }
-      } catch {
+      } catch (err) {
+        console.error('Camera error:', err)
         setCameraError('无法访问摄像头，请授予摄像头权限')
       }
     }
@@ -65,14 +75,41 @@ export default function ARPage() {
       />
 
       {/* Layer 1: Three.js AR scene */}
-      {cameraReady && latitude && longitude && (
-        <ARScene
-          userLat={latitude}
-          userLng={longitude}
-          deviceAlpha={orientation.alpha}
-          capsules={capsules}
-          onCapsuleClick={(id) => navigate(`/capsule/${id}`)}
-        />
+      {cameraReady && latitude && longitude && webglSupported && (
+        <ErrorBoundary>
+          <ARScene
+            userLat={latitude}
+            userLng={longitude}
+            deviceAlpha={orientation.alpha}
+            capsules={capsules}
+            onCapsuleClick={(id) => navigate(`/capsule/${id}`)}
+          />
+        </ErrorBoundary>
+      )}
+      
+      {/* WebGL fallback - CSS 3D animation mode */}
+      {cameraReady && latitude && longitude && !webglSupported && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center">
+          <div className="text-center p-6 glass rounded-xl max-w-md">
+            <p className="text-2xl mb-3">📦</p>
+            <p className="text-sm text-white mb-4">
+              设备不支持 WebGL，无法显示增强现实效果
+            </p>
+            <button
+              onClick={() => navigate('/')}
+              className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-light text-white mr-3 transition-colors"
+            >
+              返回地图
+            </button>
+            <button
+              onClick={() => navigate(`/capsule/${capsules[0]?.id}`)}
+              className="px-4 py-2 rounded-lg bg-surface hover:bg-surface-light text-white transition-colors"
+              disabled={!capsules.length}
+            >
+              查看胶囊
+            </button>
+          </div>
+        </div>
       )}
 
       {/* Layer 2: HTML overlay */}
@@ -105,17 +142,11 @@ export default function ARPage() {
 
       {/* Camera error */}
       {cameraError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/80">
-          <div className="text-center p-6">
-            <p className="text-2xl mb-3">📷</p>
-            <p className="text-sm text-white mb-4">{cameraError}</p>
-            <button
-              onClick={() => navigate('/')}
-              className="px-4 py-2 rounded-lg bg-surface text-sm text-white"
-            >
-              返回地图
-            </button>
-          </div>
+        <div className="absolute inset-0 z-20">
+          <FallbackARView 
+            capsules={capsules} 
+            onReturnToMap={() => navigate('/')} 
+          />
         </div>
       )}
 

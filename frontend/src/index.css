@@ -21,6 +21,35 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Ensure consistent dark theme across all pages */
+.bg-bg {
+  background-color: #0f172a; /* var(--color-bg) */
+}
+
+.bg-surface {
+  background-color: #1e293b; /* var(--color-surface) */
+}
+
+.bg-surface-light {
+  background-color: #334155; /* var(--color-surface-light) */
+}
+
+.text-primary {
+  color: #6366f1; /* var(--color-primary) */
+}
+
+.text-primary-light {
+  color: #818cf8; /* var(--color-primary-light) */
+}
+
+.text-accent {
+  color: #f59e0b; /* var(--color-accent) */
+}
+
+.text-accent-light {
+  color: #fbbf24; /* var(--color-accent-light) */
+}
+
 /* Mapbox dark theme overrides */
 .mapboxgl-map {
   border-radius: 0;
@@ -177,12 +206,125 @@ body {
   animation: slide-up-panel 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* Recommendation panel styles */
-.recommendation-card {
+/* Page transition animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(10px); }
+}
+
+.app-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.app-wrapper > div {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  animation: fadeIn 0.3s ease forwards;
+}
+
+/* Button and card micro-interactions */
+button, .card {
   transition: all 0.2s ease;
 }
 
-.recommendation-card:hover {
+button:hover, .card:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+button:active, .card:active {
+  transform: scale(0.98);
+}
+
+/* Card specific hover effects */
+.card-hover {
+  border-color: transparent;
+  transition: all 0.2s ease;
+}
+
+.card-hover:hover {
+  border-color: #f59e0b; /* var(--color-accent) */
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+/* Loading states */
+.skeleton-loader {
+  @apply animate-pulse bg-surface-light rounded;
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.envelope-loader {
+  width: 40px;
+  height: 40px;
+  background-color: #f59e0b;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='%23000' d='M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z'/%3E%3C/svg%3E");
+  mask-size: cover;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.1); opacity: 0.7; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* Safe area insets for mobile */
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
+
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.safe-area-left {
+  padding-left: env(safe-area-inset-left);
+}
+
+.safe-area-right {
+  padding-right: env(safe-area-inset-right);
+}
+
+/* Apply safe area insets to app wrapper */
+.app-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+.app-wrapper > div {
+  position: absolute;
+  top: env(safe-area-inset-top);
+  left: env(safe-area-inset-left);
+  right: env(safe-area-inset-right);
+  bottom: env(safe-area-inset-bottom);
+  animation: fadeIn 0.3s ease forwards;
+}
+
+/* Touch feedback */
+.touchable:active {
+  opacity: 0.8;
 }
