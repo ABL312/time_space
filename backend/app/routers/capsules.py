@@ -351,16 +351,27 @@ async def reply_to_capsule(
 
         await db.commit()
 
-        # 查询刚创建的 reply
-        cursor = await db.execute("SELECT * FROM capsules WHERE id = ?", (reply_id,))
+        # Fetch the created reply capsule with author info and media
+        cursor = await db.execute(
+            """
+            SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
+            FROM capsules c
+            LEFT JOIN users u ON c.author_id = u.id
+            WHERE c.id = ?
+            """,
+            (reply_id,),
+        )
         row = await cursor.fetchone()
-        capsule = _parse_capsule_row(dict(row))
+        reply_capsule = _parse_capsule_row(dict(row))
 
-        # 查询 media
-        cursor = await db.execute("SELECT * FROM media WHERE capsule_id = ? ORDER BY sort_order", (reply_id,))
+        # Fetch media
+        cursor = await db.execute(
+            "SELECT * FROM media WHERE capsule_id = ? ORDER BY sort_order",
+            (reply_id,),
+        )
         media_rows = await cursor.fetchall()
-        capsule["media"] = [dict(m) for m in media_rows]
+        reply_capsule["media"] = [dict(m) for m in media_rows]
 
-        return capsule
+        return reply_capsule
     finally:
         await db.close()

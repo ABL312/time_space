@@ -47,3 +47,6 @@ frontend/public/sw.js.map
 
 # Logs
 *.log
+
+# Docs / handover files
+docs/
