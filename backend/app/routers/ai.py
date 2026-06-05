@@ -1,7 +1,7 @@
+"""AI service routes: emotion analysis, scene recognition, location context, voice clone.
+These are implemented with dedicated services and proper fallback handling.
 """
-AI service routes: emotion analysis, scene recognition, location context, voice clone.
-These are stubs that return mock data when API keys are not configured.
-"""
+
 import os
 import json
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException
@@ -15,8 +15,16 @@ from ..models import (
     VoiceCloneResponse,
 )
 from ..services.emotion_service import emotion_service
+from ..services.location_service import LocationService
+from ..services.scene_service import SceneService
+from ..database import get_db
+from ..services.geohash_service import find_nearby_capsules
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
+
+# Initialize services
+location_service = LocationService()
+scene_service = SceneService()
 
 # Check for API keys
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
@@ -48,97 +56,39 @@ async def get_location_context(lat: float, lng: float):
     Get location context description from GPS coordinates.
     Uses reverse geocoding + GPT if available.
     """
-    # Try reverse geocoding with Nominatim (free)
-    location_name = f"{lat:.4f}, {lng:.4f}"
     try:
-        import httpx
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            resp = await client.get(
-                f"https://nominatim.openstreetmap.org/reverse",
-                params={
-                    "format": "json",
-                    "lat": lat,
-                    "lon": lng,
-                    "accept-language": "zh",
-                },
-                headers={"User-Agent": "TimeSpaceMailbox/1.0"},
-            )
-            if resp.status_code == 200:
-                data = resp.json()
-                location_name = data.get("display_name", location_name)
-                # Shorten to just the relevant parts
-                parts = location_name.split(", ")
-                location_name = ", ".join(parts[:3]) if len(parts) > 3 else location_name
+        result = await location_service.get_context(lat, lng)
+        return LocationContextResponse(**result)
     except Exception as e:
-        print(f"⚠️ Geocoding error: {e}")
-
-    return LocationContextResponse(
-        name=location_name,
-        description=f"这里有来自附近的时空胶囊，举起手机探索吧",
-        nearby_capsule_count=0,  # Will be updated by the nearby query
-        suggested_moods=["怀旧", "温暖", "希望"],
-    )
+        print(f"⚠️ Location context error: {e}")
+        # Fallback response
+        return LocationContextResponse(
+            name="未知位置",
+            description="一个神秘的地点",
+            nearby_capsule_count=0,
+            suggested_moods=["温暖", "希望"],
+        )
 
 
 @router.post("/scene", response_model=SceneResponse)
 async def recognize_scene(
     image: UploadFile = File(...),
-    latitude: float = Form(...),
-    longitude: float = Form(...),
+    latitude: Optional[float] = Form(None),
+    longitude: Optional[float] = Form(None),
 ):
     """
     Recognize scene from camera frame using GPT-4o Vision.
-    Returns mock data if API key not configured.
+    Returns fallback data if API key not configured or analysis fails.
     """
-    if not OPENAI_API_KEY:
-        return SceneResponse(
-            scene_type="outdoor",
-            description="一个户外场景",
-            atmosphere="自然、开放",
-            mood_match=["希望", "青春"],
-        )
-
     try:
-        import base64
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=OPENAI_API_KEY)
-
         content = await image.read()
-        b64_image = base64.b64encode(content).decode()
-
-        response = await client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "分析这张照片的场景类型和氛围。返回JSON格式。",
-                },
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/jpeg;base64,{b64_image}",
-                            },
-                        },
-                        {
-                            "type": "text",
-                            "text": f'返回JSON：{{"scene_type": "...", "description": "...", "atmosphere": "...", "mood_match": [...]}}。mood_match从以下选择：{json.dumps(emotion_service.EMOTION_TAGS, ensure_ascii=False)}',
-                        },
-                    ],
-                },
-            ],
-            max_tokens=300,
-            timeout=5.0,
-        )
-
-        result = json.loads(response.choices[0].message.content)
+        result = await scene_service.analyze(content, latitude, longitude)
         return SceneResponse(**result)
     except Exception as e:
-        print(f"⚠️ Vision API error: {e}")
+        print(f"⚠️ Scene recognition error: {e}")
+        # Fallback response
         return SceneResponse(
-            scene_type="outdoor",
+            scene_type="未知",
             description="场景识别暂时不可用",
             atmosphere="未知",
             mood_match=["希望"],
