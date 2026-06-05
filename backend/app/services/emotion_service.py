@@ -104,12 +104,29 @@ class EmotionService:
             timeout=3.0,
         )
 
-        result = json.loads(response.choices[0].message.content)
+        try:
+            result = json.loads(response.choices[0].message.content)
+        except (json.JSONDecodeError, TypeError, AttributeError, IndexError) as e:
+            print(f"GPT emotion analysis returned invalid JSON: {e}")
+            # Fallback to keyword analysis
+            return self._analyze_with_keywords(message)
+
+        # Check if result is valid
+        if not isinstance(result, dict):
+            print("GPT emotion analysis returned invalid result structure")
+            return self._analyze_with_keywords(message)
 
         # Validate and clamp
         emotions = [e for e in result.get("emotions", []) if e in self.EMOTION_TAGS][:4]
+        # Ensure we have at least 2 emotions
         if len(emotions) < 2:
-            emotions = self._analyze_with_keywords(message)["emotions"]
+            # Try to get more emotions from the result before falling back
+            all_emotions = [e for e in result.get("emotions", []) if e in self.EMOTION_TAGS]
+            if len(all_emotions) >= 2:
+                emotions = all_emotions[:4] if len(all_emotions) > 4 else all_emotions
+            else:
+                # Fallback to keyword analysis if we can't get enough emotions
+                emotions = self._analyze_with_keywords(message)["emotions"]
 
         sentiment = result.get("sentiment", "positive")
         if sentiment not in ("positive", "negative", "neutral"):

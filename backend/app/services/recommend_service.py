@@ -97,7 +97,8 @@ def rank_capsules(
     # Sort by match score descending
     scored.sort(key=lambda x: x["match_score"], reverse=True)
 
-    recommended = [c for c in scored if c["match_score"] > 0][:top_n]
-    others = [c for c in scored if c not in recommended]
+    # Split into recommended (top_n) and others
+    recommended = scored[:top_n]
+    others = scored[top_n:]
 
     return recommended, others

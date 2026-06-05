@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUserStore } from '../stores/userStore'
 import { usersApi } from '../lib/api'
@@ -12,6 +12,14 @@ export default function OnboardingPage() {
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isNameValid, setIsNameValid] = useState(true)
+
+  // Validate name on change
+  useEffect(() => {
+    const trimmedName = name.trim()
+    const isValid = trimmedName.length >= 1 && trimmedName.length <= 20
+    setIsNameValid(isValid)
+  }, [name])
 
   const toggleTag = (label: string) => {
     setSelectedTags((prev) =>
@@ -23,7 +31,7 @@ export default function OnboardingPage() {
     )
   }
 
-  const canSubmit = name.trim().length > 0 && name.length <= 20 && selectedTags.length === 3
+  const canSubmit = isNameValid && name.trim().length > 0 && selectedTags.length === 3
 
   const handleSubmit = async () => {
     if (!canSubmit) return
@@ -36,6 +44,7 @@ export default function OnboardingPage() {
         interest_tags: selectedTags,
       })
       setUser(user)
+      localStorage.setItem('time_space_user_id', user.id)
       navigate('/')
     } catch (err: any) {
       setError(err.message || '注册失败，请重试')
@@ -44,8 +53,18 @@ export default function OnboardingPage() {
     }
   }
 
+  // Handle Enter key press
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && canSubmit) {
+      handleSubmit()
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-bg flex flex-col items-center justify-center px-6 py-12">
+    <div 
+      className="min-h-screen bg-bg flex flex-col items-center justify-center px-6 py-12"
+      onKeyDown={handleKeyPress}
+    >
       {/* Slide-up card */}
       <div className="onboarding-card w-full max-w-sm glass rounded-3xl p-8 shadow-2xl">
         {/* Header */}
@@ -66,11 +85,18 @@ export default function OnboardingPage() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="最多20个字符"
+              placeholder="请输入1-20个字符"
               maxLength={20}
-              className="w-full px-4 py-3 rounded-xl bg-surface/80 border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all"
+              className={`w-full px-4 py-3 rounded-xl bg-surface/80 border ${
+                isNameValid ? 'border-slate-600' : 'border-red-500'
+              } text-white placeholder-slate-500 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30 transition-all`}
             />
-            <p className="text-xs text-slate-500 mt-1 text-right">{name.length}/20</p>
+            <div className="flex justify-between items-center mt-1">
+              <p className={`text-xs ${isNameValid ? 'text-slate-500' : 'text-red-400'}`}>
+                {isNameValid ? '' : '昵称需为1-20个字符'}
+              </p>
+              <p className="text-xs text-slate-500">{name.length}/20</p>
+            </div>
           </div>
 
           {/* Interest tags */}
@@ -88,11 +114,14 @@ export default function OnboardingPage() {
                   <button
                     key={tag.key}
                     onClick={() => toggleTag(tag.label)}
+                    disabled={selectedTags.length >= 3 && !isSelected}
                     className={`
                       p-3 rounded-xl text-sm text-left transition-all duration-200
                       ${isSelected
                         ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]'
-                        : 'bg-surface text-slate-400 border border-slate-600 hover:border-slate-400 hover:text-slate-200'
+                        : selectedTags.length >= 3
+                          ? 'bg-surface/50 text-slate-500 border border-slate-700 cursor-not-allowed'
+                          : 'bg-surface text-slate-400 border border-slate-600 hover:border-slate-400 hover:text-slate-200 cursor-pointer'
                       }
                     `}
                   >
@@ -102,6 +131,13 @@ export default function OnboardingPage() {
                 )
               })}
             </div>
+            {selectedTags.length !== 3 && (
+              <p className="text-xs text-red-400 mt-2">
+                {selectedTags.length > 0 
+                  ? `还需选择${3 - selectedTags.length}个标签` 
+                  : '请选择3个标签'}
+              </p>
+            )}
           </div>
 
           {/* Error message */}

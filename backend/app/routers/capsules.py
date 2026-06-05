@@ -162,6 +162,7 @@ async def get_nearby(
     lng: float,
     radius: int = 1200,
     user_id: Optional[str] = None,
+    scene_mood_match: Optional[str] = None,
 ):
     """Get nearby capsules sorted by distance, with recommendations."""
     db = await get_db()
@@ -182,9 +183,19 @@ async def get_nearby(
                 except (json.JSONDecodeError, TypeError):
                     pass
 
+        # Parse scene mood match if provided
+        scene_moods = None
+        if scene_mood_match:
+            try:
+                scene_moods = json.loads(scene_mood_match)
+                if not isinstance(scene_moods, list):
+                    scene_moods = None
+            except (json.JSONDecodeError, TypeError):
+                pass
+
         # Rank and split
         recommended, others = rank_capsules(
-            capsules, user_interest_tags, scene_mood_match=None, top_n=3
+            capsules, user_interest_tags, scene_mood_match=scene_moods, top_n=3
         )
 
         # Format responses
