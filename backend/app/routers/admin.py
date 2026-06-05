@@ -6,8 +6,11 @@ from fastapi import APIRouter, HTTPException
 from pathlib import Path
 import sys
 
-# Add the scripts directory to the path
-sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
+# Add the scripts directory and backend root to the path
+# scripts/ is at project root (sibling of app/), and seed_demo needs to import from app/
+_backend_root = Path(__file__).parent.parent.parent
+sys.path.insert(0, str(_backend_root / "scripts"))
+sys.path.insert(0, str(_backend_root))
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -22,9 +25,9 @@ async def seed_demo_data():
         raise HTTPException(status_code=403, detail="This endpoint is only available in development mode")
     
     try:
-        # Import and run the seed function
-        from ..scripts.seed_demo import main
-        main()
+        # Import and run the seed function (scripts/ is at project root, added to sys.path above)
+        import seed_demo
+        seed_demo.main()
         return {"message": "Demo data seeded successfully"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to seed demo data: {str(e)}")

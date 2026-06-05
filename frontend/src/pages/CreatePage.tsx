@@ -8,7 +8,9 @@ import { EMOTION_TAGS } from '../types'
 export default function CreatePage() {
   const navigate = useNavigate()
   const { user } = useUserStore()
-  const { latitude, longitude, error: geoError } = useGeolocation()
+  const { latitude: rawLat, longitude: rawLng, error: geoError } = useGeolocation()
+  const latitude = rawLat ?? 31.0282
+  const longitude = rawLng ?? 121.4346
 
   const [message, setMessage] = useState('')
   const [moodTags, setMoodTags] = useState<string[]>([])

@@ -55,7 +55,10 @@ app = FastAPI(
 @app.middleware("http")
 async def utf8_encoding_middleware(request, call_next):
     response = await call_next(request)
-    response.headers["Content-Type"] = "application/json; charset=utf-8"
+    # Only set JSON charset for responses that don't already have a Content-Type
+    # (i.e., skip static files like images, audio, etc.)
+    if "content-type" not in response.headers:
+        response.headers["Content-Type"] = "application/json; charset=utf-8"
     return response
 
 # ==========================================

@@ -41,7 +41,7 @@ class SceneService:
         # 2. Fallback (no API key or timeout):
         #    Return generic scene based on GPS location (use LocationService)
         #    Or return default: scene_type="未知", description="一个充满故事的地方", mood_match=["温暖","希望"]
-        return self._fallback_scene(lat, lng)
+        return await self._fallback_scene(lat, lng)
 
     async def _analyze_with_gpt(self, image_bytes: bytes) -> Optional[Dict]:
         """Call GPT-4o with vision, return scene analysis."""
@@ -93,24 +93,13 @@ class SceneService:
         
         return None
 
-    def _fallback_scene(self, lat: float = None, lng: float = None) -> Dict:
+    async def _fallback_scene(self, lat: float = None, lng: float = None) -> Dict:
         """Generic fallback when GPT unavailable."""
         # If we have GPS coordinates, try to get location context
         if lat is not None and lng is not None:
             try:
-                # In a real implementation, we would await this
-                # For fallback purposes, we'll use a simplified approach
-                # Let's actually implement this properly now
-                
-                # Create a new event loop to run the async function
-                import asyncio
-                loop = asyncio.new_event_loop()
-                asyncio.set_event_loop(loop)
-                
-                # Run the async function
-                location_context = loop.run_until_complete(
-                    self.location_service.get_context(lat, lng)
-                )
+                # Directly await the async location service
+                location_context = await self.location_service.get_context(lat, lng)
                 
                 # Use some of the location context for our scene analysis
                 scene_type_map = {
