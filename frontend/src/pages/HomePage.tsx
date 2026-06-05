@@ -5,7 +5,7 @@ import { useVirtualLocation } from '../hooks/useVirtualLocation'
 import { useCapsuleStore } from '../stores/capsuleStore'
 import { useUserStore } from '../stores/userStore'
 import { useCapabilityCheck } from '../hooks/useCapabilityCheck'
-import { searchApi } from '../lib/api'
+import { searchApi, dailyApi } from '../lib/api'
 import MapView from '../components/MapView'
 import RecommendPanel from '../components/RecommendPanel'
 import { useProximityAlert } from '../hooks/useProximityAlert'
@@ -24,6 +24,10 @@ export default function HomePage() {
   const cap = useCapabilityCheck()
   const { achievements } = useAchievements()
   const [isAchievementPanelOpen, setIsAchievementPanelOpen] = useState(false)
+  
+  // Daily recommendation
+  const [dailyRecommendation, setDailyRecommendation] = useState<Capsule | null>(null)
+  const [isLoadingDaily, setIsLoadingDaily] = useState(true)
   
   // Search states
   const [searchQuery, setSearchQuery] = useState('')
@@ -83,6 +87,19 @@ export default function HomePage() {
       fetchNearby({ lat: effectiveLatitude, lng: effectiveLongitude, radius, user_id: user.id })
     }
   }, [effectiveLatitude, effectiveLongitude, user, fetchNearby, radius])
+
+  // Fetch daily recommendation
+  useEffect(() => {
+    dailyApi.getRecommend()
+      .then((data: Capsule) => {
+        setDailyRecommendation(data)
+        setIsLoadingDaily(false)
+      })
+      .catch((err) => {
+        console.error('Failed to fetch daily recommendation:', err)
+        setIsLoadingDaily(false)
+      })
+  }, [])
 
   const handleExplore = () => {
     if (cap.shouldSkipAR) {
@@ -168,40 +185,66 @@ export default function HomePage() {
       {/* ── TOP HUD OVERLAY ── */}
       <div className="absolute top-3 left-3 right-3 z-20 space-y-2">
         {/* Search bar */}
-        <div className="hud p-2 flex items-center gap-2">
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-            placeholder="搜索胶囊..."
-            className="flex-1 bg-transparent border-none text-white placeholder-slate-500 focus:outline-none text-sm"
-          />
-          {searchQuery || selectedTag || searchResults.length > 0 ? (
-            <button 
-              onClick={clearSearch}
-              className="btn w-6 h-6 flex items-center justify-center text-slate-400 hover:text-signal"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          ) : (
-            <button 
-              onClick={handleSearch}
-              disabled={isSearching || (!searchQuery.trim() && !selectedTag)}
-              className="btn w-6 h-6 flex items-center justify-center text-slate-400 hover:text-signal disabled:opacity-50"
-            >
-              {isSearching ? (
-                <div className="w-4 h-4 border border-signal border-t-transparent animate-spin" />
-              ) : (
+          <div className="hud p-2 flex items-center gap-2">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              placeholder="搜索胶囊..."
+              className="flex-1 bg-transparent border-none text-white placeholder-slate-500 focus:outline-none text-sm"
+            />
+            {searchQuery || selectedTag || searchResults.length > 0 ? (
+              <button 
+                onClick={clearSearch}
+                className="btn w-6 h-6 flex items-center justify-center text-slate-400 hover:text-signal"
+              >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              )}
-            </button>
+              </button>
+            ) : (
+              <button 
+                onClick={handleSearch}
+                disabled={isSearching || (!searchQuery.trim() && !selectedTag)}
+                className="btn w-6 h-6 flex items-center justify-center text-slate-400 hover:text-signal disabled:opacity-50"
+              >
+                {isSearching ? (
+                  <div className="w-4 h-4 border border-signal border-t-transparent animate-spin" />
+                ) : (
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                  </svg>
+                )}
+              </button>
+            )}
+          </div>
+          
+          {/* Daily Recommendation Card */}
+          {dailyRecommendation && !searchResults.length && (
+            <div 
+              onClick={() => navigate(`/capsule/${dailyRecommendation.id}`)}
+              className="hud panel p-4 cursor-pointer hover:border-signal/30 transition-colors"
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-2 h-2 bg-signal rounded-full" />
+                <span className="label text-signal">今日推荐</span>
+              </div>
+              <p className="text-sm text-white mb-2 line-clamp-2">
+                {dailyRecommendation.message?.substring(0, 30)}{dailyRecommendation.message && dailyRecommendation.message.length > 30 ? '...' : ''}
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {dailyRecommendation.emotion_tags?.slice(0, 2).map((tag) => (
+                  <span 
+                    key={tag}
+                    className="px-1.5 py-0.5 text-xs font-mono border border-primary/20 text-primary-light bg-primary/5"
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            </div>
           )}
-        </div>
         
         {/* Search error */}
         {searchError && (
@@ -276,6 +319,27 @@ export default function HomePage() {
             <span className="data text-signal">SCANNING</span>
           </div>
         )}
+        <button
+          onClick={() => navigate('/profile')}
+          className="btn hud w-8 h-8 flex items-center justify-center text-slate-400 hover:text-signal transition-colors"
+          title="个人主页"
+        >
+          <div className="w-5 h-5 border border-signal-dim/30 flex items-center justify-center bg-signal/5 rounded">
+            <span className="text-xs font-semibold text-signal font-mono">
+              {user?.name?.charAt(0)?.toUpperCase() || '?'}
+            </span>
+          </div>
+        </button>
+        <button
+          onClick={() => navigate('/collections')}
+          className="btn hud px-2.5 py-1.5 flex items-center gap-1.5 text-slate-400 hover:text-purple-400 transition-colors"
+          title="胶囊合集"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+          </svg>
+          <span className="data">合集</span>
+        </button>
         <button
           onClick={() => navigate('/favorites')}
           className="btn hud px-2.5 py-1.5 flex items-center gap-1.5 text-slate-400 hover:text-red-400 transition-colors"

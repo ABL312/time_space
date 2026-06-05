@@ -2,9 +2,10 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useCapsuleStore } from '../stores/capsuleStore'
 import { useOfflineCache } from '../hooks/useCapabilityCheck'
-import { responsesApi, favoritesApi } from '../lib/api'
+import { responsesApi, favoritesApi, shareApi } from '../lib/api'
 import type { Capsule, CapsuleResponse } from '../types'
 import { useUserStore } from '../stores/userStore'
+import { QRCodeSVG } from 'qrcode.react'
 
 export default function CapsuleDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -32,6 +33,10 @@ export default function CapsuleDetailPage() {
     countdown_seconds?: number
   } | null>(null)
   const [countdown, setCountdown] = useState<string>('')
+
+  // Share states
+  const [showSharePanel, setShowSharePanel] = useState(false)
+  const [shareUrl, setShareUrl] = useState('')
 
   useEffect(() => {
     if (!id) return
@@ -168,23 +173,36 @@ export default function CapsuleDetailPage() {
           <span className="text-xs font-mono tracking-wider">RETURN</span>
         </button>
         <span className="label">CAPSULE // {c.id?.toString().padStart(4, '0')}</span>
-        <button 
-          onClick={toggleFavorite}
-          disabled={isTogglingFavorite}
-          className="btn flex items-center justify-center w-8 h-8"
-        >
-          {isTogglingFavorite ? (
-            <div className="w-4 h-4 border border-signal border-t-transparent animate-spin" />
-          ) : isFavorite ? (
-            <svg className="w-4 h-4 text-red-500 fill-current" viewBox="0 0 24 24">
-              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
-            </svg>
-          ) : (
+        <div className="flex gap-2">
+          <button 
+            onClick={() => {
+              setShareUrl(`${window.location.origin}/s/${c.share_token}`)
+              setShowSharePanel(true)
+            }}
+            className="btn flex items-center justify-center w-8 h-8"
+          >
             <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
             </svg>
-          )}
-        </button>
+          </button>
+          <button 
+            onClick={toggleFavorite}
+            disabled={isTogglingFavorite}
+            className="btn flex items-center justify-center w-8 h-8"
+          >
+            {isTogglingFavorite ? (
+              <div className="w-4 h-4 border border-signal border-t-transparent animate-spin" />
+            ) : isFavorite ? (
+              <svg className="w-4 h-4 text-red-500 fill-current" viewBox="0 0 24 24">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+              </svg>
+            ) : (
+              <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+              </svg>
+            )}
+          </button>
+        </div>
       </header>
 
       <div className="max-w-lg mx-auto px-4 py-6 pb-28 stagger">
@@ -432,6 +450,13 @@ export default function CapsuleDetailPage() {
             </button>
           </div>
         )}
+
+        {/* Share Panel */}
+        <SharePanel 
+          isOpen={showSharePanel} 
+          onClose={() => setShowSharePanel(false)} 
+          shareUrl={shareUrl} 
+        />
       </div>
     </div>
   )
@@ -634,4 +659,72 @@ function formatUnlockTime(dateString: string): string {
     hour: '2-digit',
     minute: '2-digit'
   })
+}
+
+// ═══════════════════════════════════════════
+// SHARE PANEL
+// ═══════════════════════════════════════════
+
+function SharePanel({ 
+  isOpen, 
+  onClose, 
+  shareUrl 
+}: { 
+  isOpen: boolean; 
+  onClose: () => void; 
+  shareUrl: string;
+}) {
+  const handleCopy = () => {
+    navigator.clipboard.writeText(shareUrl)
+      .then(() => {
+        // Could add a toast notification here
+      })
+      .catch(err => {
+        console.error('Failed to copy: ', err)
+      })
+  }
+
+  if (!isOpen) return null
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+      <div className="panel corners w-full max-w-md p-6">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-lg font-medium text-white">分享胶囊</h3>
+          <button 
+            onClick={onClose}
+            className="btn w-8 h-8 flex items-center justify-center"
+          >
+            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        
+        <div className="flex flex-col items-center py-6">
+          <div className="mb-6 p-4 bg-white">
+            <QRCodeSVG value={shareUrl} size={200} />
+          </div>
+          
+          <div className="w-full">
+            <p className="data mb-2">分享链接</p>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={shareUrl}
+                readOnly
+                className="flex-1 px-3 py-2 bg-surface border border-border text-white text-sm truncate"
+              />
+              <button
+                onClick={handleCopy}
+                className="btn px-4 py-2 border border-signal/30 text-signal text-sm font-mono tracking-wider"
+              >
+                复制
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }

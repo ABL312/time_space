@@ -197,6 +197,13 @@ export const responsesApi = {
 }
 
 // ==========================================
+// Daily API
+// ==========================================
+export const dailyApi = {
+  getRecommend: () => fetch('/api/capsules/daily-recommend').then(r => r.json())
+}
+
+// ==========================================
 // Favorites API
 // ==========================================
 export const favoritesApi = {
@@ -207,6 +214,13 @@ export const favoritesApi = {
   list: (userId: string) => fetch(`/api/favorites?user_id=${userId}`).then(r => r.json()),
   status: (capsuleId: string, userId: string) =>
     fetch(`/api/capsules/${capsuleId}/favorite-status?user_id=${userId}`).then(r => r.json())
+}
+
+// ==========================================
+// Profile API
+// ==========================================
+export const profileApi = {
+  getStats: (userId: string) => fetch(`/api/users/${userId}/stats`).then(r => r.json())
 }
 
 // ==========================================
@@ -222,6 +236,22 @@ export const searchApi = {
     if (params.radius) query.set('radius', String(params.radius))
     return fetch(`/api/capsules/search?${query}`).then(r => r.json())
   }
+}
+
+// ==========================================
+// Share API
+// ==========================================
+export const shareApi = {
+  getByToken: (token: string) => fetch(`/api/capsules/shared/${token}`).then(r => r.json()),
+  regenerate: (capsuleId: string) => fetch(`/api/capsules/${capsuleId}/regenerate-share`, { method: 'POST' }).then(r => r.json())
+}
+
+// ==========================================
+// Collections API
+// ==========================================
+export const collectionsApi = {
+  list: () => fetch('/api/collections').then(r => r.json()),
+  get: (id: string) => fetch(`/api/collections/${id}`).then(r => r.json())
 }
 
 // ==========================================

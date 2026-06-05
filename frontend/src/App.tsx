@@ -11,6 +11,10 @@ import ARPage from './pages/ARPage'
 import CapsuleDetailPage from './pages/CapsuleDetailPage'
 import MyCapsulesPage from './pages/MyCapsulesPage'
 import FavoritesPage from './pages/FavoritesPage'
+import SharedCapsulePage from './pages/SharedCapsulePage'
+import ProfilePage from './pages/ProfilePage'
+import CollectionsPage from './pages/CollectionsPage'
+import CollectionDetailPage from './pages/CollectionDetailPage'
 
 function App() {
   const { user, loadUser, isLoading } = useUserStore()
@@ -66,6 +70,22 @@ function App() {
         <Route
           path="/favorites"
           element={user ? <FavoritesPage /> : <Navigate to="/onboarding" replace />}
+        />
+        <Route
+          path="/s/:token"
+          element={<SharedCapsulePage />}
+        />
+        <Route
+          path="/profile"
+          element={user ? <ProfilePage /> : <Navigate to="/onboarding" replace />}
+        />
+        <Route
+          path="/collections"
+          element={user ? <CollectionsPage /> : <Navigate to="/onboarding" replace />}
+        />
+        <Route
+          path="/collections/:id"
+          element={user ? <CollectionDetailPage /> : <Navigate to="/onboarding" replace />}
         />
         {/* Catch-all redirect */}
         <Route path="*" element={<Navigate to="/" replace />} />
