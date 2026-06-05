@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom'
 import { useGeolocation } from '../hooks/useGeolocation'
 import { useCapsuleStore } from '../stores/capsuleStore'
 import { useUserStore } from '../stores/userStore'
+import { aiApi } from '../lib/api'
 import MapView from '../components/MapView'
-import type { Capsule } from '../types'
+import type { Capsule, LocationContext } from '../types'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -12,6 +13,9 @@ export default function HomePage() {
   const { user } = useUserStore()
   const { fetchNearby, nearby, recommendedCapsules, otherCapsules, isLoadingNearby } = useCapsuleStore()
   const [isRefreshing, setIsRefreshing] = useState(false)
+  const [locationContext, setLocationContext] = useState<LocationContext | null>(null)
+  const [locationContextLoading, setLocationContextLoading] = useState(false)
+  const [locationContextError, setLocationContextError] = useState<string | null>(null)
 
   // Fetch nearby capsules when location is available
   useEffect(() => {
@@ -30,6 +34,28 @@ export default function HomePage() {
       })
     }
   }, [latitude, longitude, user, fetchNearby, accuracy])
+
+  // Fetch location context when location is available
+  useEffect(() => {
+    const fetchLocationContext = async () => {
+      if (!latitude || !longitude) return
+      
+      setLocationContextLoading(true)
+      setLocationContextError(null)
+      
+      try {
+        const context = await aiApi.getLocationContext(latitude, longitude)
+        setLocationContext(context)
+      } catch (err) {
+        console.error('Failed to fetch location context:', err)
+        setLocationContextError(err instanceof Error ? err.message : '获取位置信息失败')
+      } finally {
+        setLocationContextLoading(false)
+      }
+    }
+
+    fetchLocationContext()
+  }, [latitude, longitude])
 
   const handleRefreshNearby = async () => {
     if (latitude && longitude && user) {
@@ -109,6 +135,7 @@ export default function HomePage() {
         latitude={latitude ?? 31.03}
         longitude={longitude ?? 121.21}
         capsules={[...(recommendedCapsules.length > 0 ? recommendedCapsules : mockRecommendedCapsules), ...otherCapsules]}
+        onCapsuleClick={(capsule) => navigate(`/capsule/${capsule.id}`)}
       />
 
       {/* Bottom panel */}
@@ -116,10 +143,30 @@ export default function HomePage() {
         {/* Location context */}
         <div className="mb-3">
           <p className="text-xs text-slate-400">📍 当前位置</p>
-          <p className="text-sm text-white font-medium">
-            {nearby?.location_context?.name || '获取位置中...'}
-          </p>
-          {nearby?.location_context?.description && (
+          {locationContextLoading ? (
+            <p className="text-sm text-white font-medium">获取位置信息中...</p>
+          ) : locationContext ? (
+            <>
+              <p className="text-sm text-white font-medium">{locationContext.name}</p>
+              {locationContext.description && (
+                <p className="text-xs text-slate-300 mt-1 line-clamp-2">{locationContext.description}</p>
+              )}
+            </>
+          ) : locationContextError ? (
+            <p className="text-sm text-amber-400 font-medium">
+              {latitude && longitude 
+                ? `${latitude.toFixed(4)}, ${longitude.toFixed(4)}` 
+                : '无法获取位置信息'}
+            </p>
+          ) : (
+            <p className="text-sm text-white font-medium">
+              {nearby?.location_context?.name || 
+               (latitude && longitude 
+                 ? `${latitude.toFixed(4)}, ${longitude.toFixed(4)}` 
+                 : '获取位置中...')}
+            </p>
+          )}
+          {nearby?.location_context?.description && !locationContext?.description && (
             <p className="text-xs text-slate-300 mt-1 line-clamp-2">
               {nearby.location_context.description}
             </p>
@@ -129,7 +176,7 @@ export default function HomePage() {
         {/* Stats */}
         <div className="flex items-center justify-between mb-3">
           <span className="text-sm text-slate-300">
-            附近 <span className="text-accent font-bold">{nearby?.total ?? 0}</span> 个时空胶囊
+            附近 <span className="text-accent font-bold">{locationContext?.nearby_capsule_count ?? nearby?.total ?? 0}</span> 个时空胶囊
           </span>
           {(recommendedCapsules.length > 0 || mockRecommendedCapsules.length > 0) && (
             <span className="text-xs text-primary-light">
