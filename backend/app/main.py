@@ -50,6 +50,15 @@ app = FastAPI(
 )
 
 # ==========================================
+# UTF-8 Encoding Middleware
+# ==========================================
+@app.middleware("http")
+async def utf8_encoding_middleware(request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Type"] = "application/json; charset=utf-8"
+    return response
+
+# ==========================================
 # CORS Configuration
 # ==========================================
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")

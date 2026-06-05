@@ -1,7 +1,7 @@
 """
 Pydantic models for request validation and response serialization.
 """
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional
 from datetime import datetime
 
@@ -10,17 +10,23 @@ from datetime import datetime
 # User models
 # ==========================================
 class UserCreate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     name: str = Field(..., min_length=1, max_length=20)
     interest_tags: list[str] = Field(..., min_length=3, max_length=3)
 
 
 class UserUpdate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     name: Optional[str] = Field(None, min_length=1, max_length=20)
     interest_tags: Optional[list[str]] = None
     avatar_url: Optional[str] = None
 
 
 class UserResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: str
     name: str
     avatar_url: Optional[str] = None
@@ -32,6 +38,8 @@ class UserResponse(BaseModel):
 # Capsule models
 # ==========================================
 class CapsuleCreate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     message: str = Field(..., min_length=10, max_length=500)
     latitude: float
     longitude: float
@@ -41,6 +49,8 @@ class CapsuleCreate(BaseModel):
 
 
 class CapsuleResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: str
     author_id: str
     author: Optional[dict] = None
@@ -66,6 +76,8 @@ class CapsuleResponse(BaseModel):
 
 
 class NearbyResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     location_context: Optional[dict] = None
     total: int
     recommended: list[CapsuleResponse]
@@ -76,6 +88,8 @@ class NearbyResponse(BaseModel):
 # Media models
 # ==========================================
 class MediaResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: str
     capsule_id: str
     type: str
@@ -88,10 +102,14 @@ class MediaResponse(BaseModel):
 # AI models
 # ==========================================
 class EmotionAnalysisRequest(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     message: str
 
 
 class EmotionAnalysisResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     emotions: list[str]
     sentiment: str
     intensity: float
@@ -99,6 +117,8 @@ class EmotionAnalysisResponse(BaseModel):
 
 
 class SceneResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     scene_type: str
     description: str
     atmosphere: str
@@ -106,6 +126,8 @@ class SceneResponse(BaseModel):
 
 
 class LocationContextResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     name: str
     description: str
     nearby_capsule_count: int = 0
@@ -113,6 +135,8 @@ class LocationContextResponse(BaseModel):
 
 
 class VoiceCloneResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     voice_id: str
     audio_url: str
     duration_seconds: float
@@ -122,6 +146,8 @@ class VoiceCloneResponse(BaseModel):
 # Interaction models
 # ==========================================
 class InteractionCreate(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     capsule_id: str
     user_id: str
     action: str  # open/reply/react
