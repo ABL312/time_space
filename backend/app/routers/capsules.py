@@ -220,9 +220,16 @@ async def get_nearby(
 
 @router.get("/{capsule_id}")
 async def get_capsule(capsule_id: str):
-    """Get capsule detail by ID."""
+    """Get capsule detail by ID. Auto-increments open_count."""
     db = await get_db()
     try:
+        # Increment open_count
+        await db.execute(
+            "UPDATE capsules SET open_count = open_count + 1 WHERE id = ?",
+            (capsule_id,),
+        )
+        await db.commit()
+
         cursor = await db.execute(
             """
             SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
@@ -245,6 +252,17 @@ async def get_capsule(capsule_id: str):
         )
         media_rows = await cursor.fetchall()
         capsule["media"] = [dict(m) for m in media_rows]
+
+        # Record interaction
+        interaction_id = str(uuid.uuid4())
+        await db.execute(
+            """
+            INSERT INTO interactions (id, capsule_id, user_id, action)
+            VALUES (?, ?, NULL, 'open')
+            """,
+            (interaction_id, capsule_id),
+        )
+        await db.commit()
 
         return capsule
     finally:
