@@ -109,6 +109,11 @@ export const capsulesApi = {
     return request(`/capsules/nearby?${searchParams.toString()}`, undefined, 5000)
   },
 
+  /** Get my capsules (created by current user) */
+  getMine(userId: string): Promise<{ capsules: Capsule[]; total: number }> {
+    return request(`/capsules/mine?user_id=${userId}`)
+  },
+
   /** Get capsule detail */
   getById(id: string): Promise<Capsule> {
     return request(`/capsules/${id}`, undefined, 5000)

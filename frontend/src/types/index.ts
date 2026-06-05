@@ -104,7 +104,7 @@ export interface VoiceCloneResult {
 export const INTEREST_TAGS = [
   { key: 'campus', label: '校园回忆', emoji: '🏫' },
   { key: 'love', label: '爱情故事', emoji: '💕' },
-  { key: 'family', label: '家庭传承', emoji: '👨‍👩‍👧' },
+  { key: 'family', label: '旅行记忆', emoji: '✈️' },
   { key: 'history', label: '历史文化', emoji: '🏛️' },
   { key: 'life', label: '人生感悟', emoji: '🎭' },
   { key: 'funny', label: '搞笑趣事', emoji: '😂' },

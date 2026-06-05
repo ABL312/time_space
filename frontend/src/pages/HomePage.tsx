@@ -14,7 +14,7 @@ export default function HomePage() {
   const navigate = useNavigate()
   const { latitude, longitude, error: geoError } = useGeolocation()
   const { virtualLocation, setVirtual } = useVirtualLocation()
-  const { user } = useUserStore()
+  const { user, clearUser } = useUserStore()
   const { fetchNearby, nearby, isLoadingNearby } = useCapsuleStore()
   const cap = useCapabilityCheck()
   
@@ -92,13 +92,35 @@ export default function HomePage() {
         )}
       </div>
 
-      {/* ── LOADING INDICATOR ── */}
-      {isLoadingNearby && (
-        <div className="absolute top-3 right-3 z-20 hud px-3 py-1.5 flex items-center gap-2">
-          <div className="w-2.5 h-2.5 border border-signal border-t-transparent animate-spin" />
-          <span className="data text-signal">SCANNING</span>
-        </div>
-      )}
+      {/* ── TOP-RIGHT: Loading + Logout ── */}
+      <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
+        {isLoadingNearby && (
+          <div className="hud px-3 py-1.5 flex items-center gap-2">
+            <div className="w-2.5 h-2.5 border border-signal border-t-transparent animate-spin" />
+            <span className="data text-signal">SCANNING</span>
+          </div>
+        )}
+        <button
+          onClick={() => navigate('/mine')}
+          className="btn hud px-2.5 py-1.5 flex items-center gap-1.5 text-slate-400 hover:text-capsule transition-colors"
+          title="我的胶囊"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+          </svg>
+          <span className="data">MINE</span>
+        </button>
+        <button
+          onClick={clearUser}
+          className="btn hud px-2.5 py-1.5 flex items-center gap-1.5 text-slate-400 hover:text-signal transition-colors"
+          title={`退出 ${user?.name || ''}`}
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+          </svg>
+          <span className="data">{user?.name?.slice(0, 6) || 'EXIT'}</span>
+        </button>
+      </div>
 
       {/* ── FLOATING ACTION BUTTONS ── */}
       <div className="absolute bottom-24 right-3 z-10 flex flex-col gap-2">

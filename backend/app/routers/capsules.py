@@ -157,6 +157,43 @@ async def create_capsule(
         await db.close()
 
 
+@router.get("/mine")
+async def get_my_capsules(user_id: str):
+    """Get all capsules created by a specific user."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            """
+            SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
+            FROM capsules c
+            LEFT JOIN users u ON c.author_id = u.id
+            WHERE c.author_id = ?
+            ORDER BY c.created_at DESC
+            LIMIT 50
+            """,
+            (user_id,),
+        )
+        rows = await cursor.fetchall()
+
+        capsules = []
+        for row in rows:
+            capsule = _parse_capsule_row(dict(row))
+
+            # Fetch media for each capsule
+            media_cursor = await db.execute(
+                "SELECT * FROM media WHERE capsule_id = ? ORDER BY sort_order",
+                (capsule["id"],),
+            )
+            media_rows = await media_cursor.fetchall()
+            capsule["media"] = [dict(m) for m in media_rows]
+
+            capsules.append(capsule)
+
+        return {"capsules": capsules, "total": len(capsules)}
+    finally:
+        await db.close()
+
+
 @router.get("/nearby", response_model=NearbyResponse)
 async def get_nearby(
     lat: float,

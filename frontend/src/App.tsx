@@ -8,6 +8,7 @@ import OnboardingPage from './pages/OnboardingPage'
 import CreatePage from './pages/CreatePage'
 import ARPage from './pages/ARPage'
 import CapsuleDetailPage from './pages/CapsuleDetailPage'
+import MyCapsulesPage from './pages/MyCapsulesPage'
 
 function App() {
   const { user, loadUser, isLoading } = useUserStore()
@@ -49,6 +50,10 @@ function App() {
         <Route
           path="/capsule/:id"
           element={user ? <CapsuleDetailPage /> : <Navigate to="/onboarding" replace />}
+        />
+        <Route
+          path="/mine"
+          element={user ? <MyCapsulesPage /> : <Navigate to="/onboarding" replace />}
         />
         {/* Catch-all redirect */}
         <Route path="*" element={<Navigate to="/" replace />} />
