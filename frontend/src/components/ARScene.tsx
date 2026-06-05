@@ -16,7 +16,7 @@ export default function ARScene({
   userLng,
   deviceAlpha,
   capsules,
-  onCapsuleClick,
+  onCapsuleClick: _onCapsuleClick,
 }: ARSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)

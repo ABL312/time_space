@@ -144,3 +144,19 @@ body {
   opacity: 0;
   animation: tag-fade-in 0.4s ease-out forwards;
 }
+
+/* Onboarding card slide-up entrance */
+@keyframes slide-up {
+  0% {
+    opacity: 0;
+    transform: translateY(40px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.onboarding-card {
+  animation: slide-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
