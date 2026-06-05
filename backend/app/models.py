@@ -152,3 +152,25 @@ class InteractionCreate(BaseModel):
     user_id: str
     action: str  # open/reply/react
     reaction: Optional[str] = None
+
+
+# ==========================================
+# Response models
+# ==========================================
+class ResponseCreateModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    user_id: Optional[str] = None
+    nickname: str = "匿名"
+    content: str = Field(..., min_length=1, max_length=500)
+
+
+class ResponseModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: str
+    capsule_id: str
+    user_id: Optional[str] = None
+    nickname: str
+    content: str
+    created_at: str

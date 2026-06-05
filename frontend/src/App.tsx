@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useUserStore } from './stores/userStore'
+import { useTimeTheme } from './hooks/useTimeTheme'
 
 // Pages
 import HomePage from './pages/HomePage'
@@ -12,6 +13,12 @@ import MyCapsulesPage from './pages/MyCapsulesPage'
 
 function App() {
   const { user, loadUser, isLoading } = useUserStore()
+  const theme = useTimeTheme()
+
+  useEffect(() => {
+    // Apply theme to document element
+    document.documentElement.dataset.theme = theme
+  }, [theme])
 
   useEffect(() => {
     loadUser()

@@ -46,6 +46,9 @@ CREATE TABLE IF NOT EXISTS capsules (
     visibility TEXT DEFAULT 'public',  -- public/private/link_only
     target_user_id TEXT,
     
+    -- Time lock
+    unlock_at TIMESTAMP,  -- NULL means immediately available
+    
     -- Metadata
     mood_tag TEXT,
     open_count INTEGER DEFAULT 0,
@@ -72,12 +75,31 @@ CREATE TABLE IF NOT EXISTS interactions (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS responses (
+    id TEXT PRIMARY KEY,
+    capsule_id TEXT NOT NULL,
+    user_id TEXT,
+    nickname TEXT DEFAULT '匿名',
+    content TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (capsule_id) REFERENCES capsules(id)
+);
+
 -- Indexes for fast nearby queries
 CREATE INDEX IF NOT EXISTS idx_capsules_geohash ON capsules(geohash);
 CREATE INDEX IF NOT EXISTS idx_capsules_location ON capsules(latitude, longitude);
 CREATE INDEX IF NOT EXISTS idx_media_capsule ON media(capsule_id);
 CREATE INDEX IF NOT EXISTS idx_interactions_capsule ON interactions(capsule_id);
 CREATE INDEX IF NOT EXISTS idx_interactions_user ON interactions(user_id);
+
+CREATE TABLE IF NOT EXISTS favorites (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    capsule_id TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, capsule_id),
+    FOREIGN KEY (capsule_id) REFERENCES capsules(id)
+);
 """
 
 

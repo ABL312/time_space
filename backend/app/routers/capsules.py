@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 
 from ..database import get_db
 from ..models import CapsuleResponse, NearbyResponse
-from ..services.geohash_service import encode, find_nearby_capsules, haversine_distance
+from ..services.geohash_service import encode, find_nearby_capsules, haversine_distance, calculate_bounding_box
 from ..services.recommend_service import rank_capsules
 from ..services.storage_service import storage_service
 from ..services.emotion_service import emotion_service
@@ -414,5 +414,124 @@ async def reply_to_capsule(
         reply_capsule["media"] = [dict(m) for m in media_rows]
 
         return reply_capsule
+    finally:
+        await db.close()
+
+
+@router.get("/search")
+async def search_capsules(
+    q: Optional[str] = None,
+    tag: Optional[str] = None,
+    lat: Optional[float] = None,
+    lng: Optional[float] = None,
+    radius: int = 5000,
+    user_id: Optional[str] = None,
+):
+    """Search capsules by content, tags, and location."""
+    db = await get_db()
+    try:
+        # Build query dynamically based on provided parameters
+        base_query = """
+            SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
+            FROM capsules c
+            LEFT JOIN users u ON c.author_id = u.id
+            WHERE 1=1
+        """
+        params = []
+        
+        # Text search in message content
+        if q:
+            base_query += " AND c.message LIKE ?"
+            params.append(f"%{q}%")
+        
+        # Tag filtering (emotion_tags)
+        if tag:
+            # Split comma-separated tags if provided
+            tags = [t.strip() for t in tag.split(",")]
+            tag_conditions = " OR ".join(["c.emotion_tags LIKE ?" for _ in tags])
+            base_query += f" AND ({tag_conditions})"
+            for t in tags:
+                params.append(f"%{t}%")
+        
+        # Location-based filtering
+        if lat is not None and lng is not None:
+            # Calculate bounding box for initial filtering
+            min_lat, max_lat, min_lng, max_lng = calculate_bounding_box(lat, lng, radius)
+            
+            base_query += " AND c.latitude BETWEEN ? AND ? AND c.longitude BETWEEN ? AND ?"
+            params.extend([min_lat, max_lat, min_lng, max_lng])
+        
+        base_query += " ORDER BY c.created_at DESC LIMIT 100"
+        
+        cursor = await db.execute(base_query, params)
+        rows = await cursor.fetchall()
+        
+        # Process results and filter by precise distance if location search
+        capsules = []
+        for row in rows:
+            capsule = _parse_capsule_row(dict(row))
+            
+            # Precise distance filtering for location-based searches
+            if lat is not None and lng is not None:
+                from ..services.geohash_service import haversine_distance
+                capsule_lat = capsule["latitude"]
+                capsule_lng = capsule["longitude"]
+                distance = haversine_distance(lat, lng, capsule_lat, capsule_lng)
+                
+                # Skip capsules outside the radius
+                if distance > radius:
+                    continue
+                
+                capsule["distance_m"] = distance
+            
+            # Fetch media
+            media_cursor = await db.execute(
+                "SELECT * FROM media WHERE capsule_id = ? ORDER BY sort_order",
+                (capsule["id"],),
+            )
+            media_rows = await media_cursor.fetchall()
+            capsule["media"] = [dict(m) for m in media_rows]
+            
+            capsules.append(capsule)
+        
+        # Apply recommendation ranking if user_id is provided
+        if user_id and capsules:
+            # Get user interest tags for ranking
+            user_interest_tags = []
+            cursor = await db.execute(
+                "SELECT interest_tags FROM users WHERE id = ?", (user_id,)
+            )
+            row = await cursor.fetchone()
+            if row and row[0]:
+                try:
+                    user_interest_tags = json.loads(row[0])
+                    # Ensure it's a list
+                    if not isinstance(user_interest_tags, list):
+                        user_interest_tags = []
+                except (json.JSONDecodeError, TypeError):
+                    user_interest_tags = []
+            
+            # Simple ranking by user interests
+            if user_interest_tags:
+                for capsule in capsules:
+                    match_score = 0
+                    match_reasons = []
+                    
+                    # Check emotion tags match
+                    capsule_tags = capsule.get("emotion_tags", [])
+                    if capsule_tags:
+                        for tag in user_interest_tags:
+                            if tag in capsule_tags:
+                                match_score += 1
+                                match_reasons.append(f"匹配情感标签: {tag}")
+                    
+                    capsule["match_score"] = match_score
+                    capsule["match_reasons"] = match_reasons
+                
+                # Sort by match score
+                capsules.sort(key=lambda x: x.get("match_score", 0), reverse=True)
+        
+        return {"capsules": capsules, "total": len(capsules)}
+        
     finally:
         await db.close()

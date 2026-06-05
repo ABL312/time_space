@@ -1,58 +1,81 @@
-你是「时空信箱」项目的 frontend-dev，现在执行 Phase 1 任务。
+# frontend-dev Phase 1 任务
 
-## 你的任务: 完善胶囊详情展示页面 (Issue #6/#8)
+你是「时空信箱」项目的 frontend-dev。
 
-### 目标
-完善 frontend/src/pages/CapsuleDetailPage.tsx，使其成为完整的胶囊打开体验页面。
+## 项目信息
+- 仓库: D:\time_space
+- 分支: feature/phase2-enhancements (已切换)
+- GitHub: https://github.com/ABL312/time_space
+- 技术栈: Vite + React + TypeScript + Tailwind CSS v4
 
-### 当前状态
-文件已存在且有基础骨架（作者信息、留言展示、情感标签、照片横滚、audio控件、位置信息、回应按钮）。
+## 重要：先拉最新代码
+```bash
+git pull origin feature/phase2-enhancements
+```
 
-### 需要增强的功能
+## 任务清单（3个Issue，都是纯前端）
 
-1. **信封展开动画** — 添加 CSS @keyframes 动画到 frontend/src/index.css：
-   - 从折叠（scaleY(0) + opacity(0)）到展开（scaleY(1) + opacity(1)）
-   - 时长 0.8s, ease-out
-   - 信封图标（✉️）先出现，然后内容渐入
+### Issue #26 - 探索成就系统
+**实现：**
+1. 创建 src/hooks/useAchievements.ts：
+   - 用 localStorage 存储成就进度
+   - 成就定义：
+     - 初次探索：打开第1个胶囊
+     - 好奇者：打开5个胶囊
+     - 故事收集者：打开20个胶囊
+     - 探索达人：打开50个胶囊
+     - 分享者：创建第1个胶囊
+     - 多产创作者：创建10个胶囊
+2. 创建 src/components/AchievementPanel.tsx：
+   - 展示所有成就卡片
+   - 已解锁的显示彩色图标+解锁时间
+   - 未解锁的显示灰色+进度条
+3. 在 HomePage 添加入口按钮（右下角或顶部）
 
-2. **照片全屏查看** — 点击照片可以全屏查看：
-   - 添加全屏 overlay（z-50, fixed, bg-black/90）
-   - 左右滑动/点击切换照片
-   - 点击空白处或×关闭
-   - 用 useState 管理当前查看的照片索引
+### Issue #34 - 天气/时间氛围主题
+**实现：**
+1. 创建 src/hooks/useTimeTheme.ts：
+   - 根据当前小时返回主题：
+     - 6-11点: morning (暖色调)
+     - 12-17点: afternoon (明亮)
+     - 18-21点: evening (橙紫渐变)
+     - 22-5点: night (深蓝+星光)
+2. 在 index.css 添加CSS变量：
+   ```css
+   :root {
+     --bg-primary: #0f172a;
+     --bg-secondary: #1e293b;
+     --accent: #6366f1;
+   }
+   [data-theme="morning"] { --bg-primary: #fef3c7; --accent: #f59e0b; }
+   [data-theme="afternoon"] { --bg-primary: #f0f9ff; --accent: #0ea5e9; }
+   [data-theme="evening"] { --bg-primary: #1e1b4b; --accent: #a855f7; }
+   [data-theme="night"] { --bg-primary: #020617; --accent: #818cf8; }
+   ```
+3. 在 App.tsx 应用主题：document.documentElement.dataset.theme = theme
+4. 地图样式也随主题切换（用不同的 tile URL 或 CSS filter）
 
-3. **自定义语音播放器** — 替换原生 audio controls：
-   - 播放/暂停按钮（▶/⏸）
-   - 进度条（可拖动的 div）
-   - 时间显示 (当前/总时长)
-   - 优先播放 voice_clone_url，fallback 到 voice_url
-   - 使用 useRef 获取 audio 元素
+### Issue #33 - 胶囊弹幕效果
+**实现：**
+1. 创建 src/components/DanmakuLayer.tsx：
+   - 定时从 /api/capsules/recent?limit=20 获取最新消息
+   - 消息以弹幕形式从右向左飘过地图
+   - 每条弹幕显示：消息前20字 + 情感标签
+   - CSS动画：transform: translateX(-100%) 10s linear
+   - 随机高度，避免重叠
+2. 在 HomePage 的地图区域叠加 DanmakuLayer
+3. 添加开关按钮让用户可以关闭弹幕
 
-4. **照片轮播增强** — 改进现有的横向滚动：
-   - 添加左右箭头按钮（当照片>1张时）
-   - 当前照片指示器（小圆点）
-   - 使用 useRef + scrollIntoView 实现
+## 开发规范
+- 用 Tailwind utility classes
+- 暗色主题为主（配合时间主题切换）
+- 中文 UI
+- 动画用 CSS transition/animation，不用 JS 动画库
+- 完成后：
+  ```bash
+  git add -A
+  git commit -m "feat: 成就系统+时间主题+弹幕效果 (#26,#34,#33)"
+  git push origin feature/phase2-enhancements
+  ```
 
-5. **情感标签动画** — 标签依次淡入（stagger animation）
-
-### 技术要求
-- Tailwind utility classes，暗色主题 (bg-bg=#0f172a, bg-surface=#1e293b)
-- 动画 CSS 写在 frontend/src/index.css 中（@keyframes）
-- 中文 UI 文案
-- 所有新增组件内联在 CapsuleDetailPage.tsx 中（不拆文件，hackathon 优先）
-- TypeScript 严格类型
-
-### 完成标准
-- [ ] 打开页面有信封展开动画
-- [ ] 照片可以点击查看全屏
-- [ ] 全屏照片可以左右切换
-- [ ] 语音有自定义播放UI（非原生controls）
-- [ ] 情感标签有淡入动画
-- [ ] 所有功能在暗色主题下美观
-
-### 工作流
-1. 先 cd 到 D:/time_space && git pull
-2. 读取现有 CapsuleDetailPage.tsx 和 index.css
-3. 实现上述增强
-4. git add . && git commit -m "feat(frontend): enhance capsule detail page with animations, fullscreen photos, custom audio player"
-5. git push origin main
+## 遇到任何错误立即停止并报告，不要猜测修复。

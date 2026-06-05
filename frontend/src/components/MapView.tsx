@@ -19,6 +19,7 @@ export default function MapView({
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map | null>(null)
   const markersRef = useRef<L.LayerGroup | null>(null)
+  const tileLayerRef = useRef<L.TileLayer | null>(null)
 
   // Initialize map
   useEffect(() => {
@@ -32,7 +33,7 @@ export default function MapView({
     })
 
     // 高德地图瓦片 — 国内快速访问
-    L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+    tileLayerRef.current = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
       attribution: '&copy; 高德地图',
       subdomains: '1234',
       maxZoom: 18,
@@ -49,6 +50,59 @@ export default function MapView({
       map.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Update map style based on theme
+  useEffect(() => {
+    const updateMapStyle = () => {
+      const theme = document.documentElement.dataset.theme || 'night'
+      
+      if (tileLayerRef.current && map.current) {
+        // Remove existing tile layer
+        tileLayerRef.current.removeFrom(map.current)
+        
+        // Add new tile layer based on theme
+        if (theme === 'morning') {
+          tileLayerRef.current = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}', {
+            attribution: '&copy; 高德地图',
+            subdomains: '1234',
+            maxZoom: 18,
+          }).addTo(map.current)
+        } else if (theme === 'afternoon') {
+          tileLayerRef.current = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+            attribution: '&copy; 高德地图',
+            subdomains: '1234',
+            maxZoom: 18,
+          }).addTo(map.current)
+        } else if (theme === 'evening') {
+          tileLayerRef.current = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=6&x={x}&y={y}&z={z}', {
+            attribution: '&copy; 高德地图',
+            subdomains: '1234',
+            maxZoom: 18,
+          }).addTo(map.current)
+        } else {
+          // night theme (default)
+          tileLayerRef.current = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+            attribution: '&copy; 高德地图',
+            subdomains: '1234',
+            maxZoom: 18,
+          }).addTo(map.current)
+        }
+      }
+    }
+
+    updateMapStyle()
+    
+    // Listen for theme changes
+    const observer = new MutationObserver(updateMapStyle)
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme']
+    })
+
+    return () => {
+      observer.disconnect()
+    }
   }, [])
 
   // Fly to position on change
@@ -102,7 +156,5 @@ export default function MapView({
     })
   }, [capsules, latitude, longitude, onCapsuleClick])
 
-  return <div ref={mapContainer} className="absolute inset-0 w-full h-full" style={{
-    filter: 'invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9) saturate(0.8)',
-  }} />
+  return <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
 }

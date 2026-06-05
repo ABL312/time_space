@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGeolocation } from '../hooks/useGeolocation'
 import { useVirtualLocation } from '../hooks/useVirtualLocation'
@@ -9,6 +9,9 @@ import MapView from '../components/MapView'
 import RecommendPanel from '../components/RecommendPanel'
 import { useProximityAlert } from '../hooks/useProximityAlert'
 import ProximityAlert from '../components/ProximityAlert'
+import { useAchievements } from '../hooks/useAchievements'
+import AchievementPanel from '../components/AchievementPanel'
+import DanmakuLayer from '../components/DanmakuLayer'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -17,6 +20,8 @@ export default function HomePage() {
   const { user, clearUser } = useUserStore()
   const { fetchNearby, nearby, isLoadingNearby } = useCapsuleStore()
   const cap = useCapabilityCheck()
+  const { achievements } = useAchievements()
+  const [isAchievementPanelOpen, setIsAchievementPanelOpen] = useState(false)
   
   // 优先使用虚拟位置，否则使用真实位置，最后使用默认演示位置
   const effectiveLatitude = virtualLocation?.lat ?? latitude ?? 31.0282
@@ -54,6 +59,9 @@ export default function HomePage() {
         longitude={effectiveLongitude ?? 121.4346}
         capsules={nearby ? [...nearby.recommended, ...nearby.others] : []}
       />
+
+      {/* Danmaku Layer */}
+      <DanmakuLayer />
 
       {/* ── TOP HUD OVERLAY ── */}
       <div className="absolute top-3 left-3 right-3 z-20 space-y-2">
@@ -100,6 +108,16 @@ export default function HomePage() {
             <span className="data text-signal">SCANNING</span>
           </div>
         )}
+        <button
+          onClick={() => setIsAchievementPanelOpen(true)}
+          className="btn hud px-2.5 py-1.5 flex items-center gap-1.5 text-slate-400 hover:text-yellow-300 transition-colors"
+          title="成就系统"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+          </svg>
+          <span className="data">成就</span>
+        </button>
         <button
           onClick={() => navigate('/mine')}
           className="btn hud px-2.5 py-1.5 flex items-center gap-1.5 text-slate-400 hover:text-capsule transition-colors"
@@ -179,6 +197,13 @@ export default function HomePage() {
           onView={() => navigate(`/capsule/${triggeredCapsule.id}`)}
         />
       )}
+
+      {/* ── ACHIEVEMENT PANEL ── */}
+      <AchievementPanel 
+        achievements={achievements} 
+        isOpen={isAchievementPanelOpen} 
+        onClose={() => setIsAchievementPanelOpen(false)} 
+      />
     </div>
   )
 }

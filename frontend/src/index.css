@@ -505,3 +505,33 @@ body::after {
   background: var(--color-surface-light);
   border-radius: 2px;
 }
+
+/* ==========================================
+   TIME THEMES: Dynamic time-of-day themes
+   ========================================== */
+
+:root {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --accent: #6366f1;
+}
+
+[data-theme="morning"] {
+  --bg-primary: #fef3c7;
+  --accent: #f59e0b;
+}
+
+[data-theme="afternoon"] {
+  --bg-primary: #f0f9ff;
+  --accent: #0ea5e9;
+}
+
+[data-theme="evening"] {
+  --bg-primary: #1e1b4b;
+  --accent: #a855f7;
+}
+
+[data-theme="night"] {
+  --bg-primary: #020617;
+  --accent: #818cf8;
+}
