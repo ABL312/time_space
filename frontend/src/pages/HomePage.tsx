@@ -6,6 +6,8 @@ import { useUserStore } from '../stores/userStore'
 import { useCapabilityCheck } from '../hooks/useCapabilityCheck'
 import MapView from '../components/MapView'
 import RecommendPanel from '../components/RecommendPanel'
+import { useProximityAlert } from '../hooks/useProximityAlert'
+import ProximityAlert from '../components/ProximityAlert'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -13,6 +15,13 @@ export default function HomePage() {
   const { user } = useUserStore()
   const { fetchNearby, nearby, isLoadingNearby } = useCapsuleStore()
   const cap = useCapabilityCheck()
+  
+  // Proximity alert hook
+  const { triggeredCapsule, distance, dismiss } = useProximityAlert({
+    userLat: latitude,
+    userLng: longitude,
+    nearbyCapsules: nearby ? [...nearby.recommended, ...nearby.others] : []
+  })
 
   const radius = cap.useExpandedGPS ? 5000 : 1200
 
@@ -113,6 +122,16 @@ export default function HomePage() {
 
       {/* ── RECOMMEND PANEL ── */}
       <RecommendPanel />
+      
+      {/* ── PROXIMITY ALERT ── */}
+      {triggeredCapsule && distance !== null && (
+        <ProximityAlert
+          capsule={triggeredCapsule}
+          distance={distance}
+          onDismiss={dismiss}
+          onView={() => navigate(`/capsule/${triggeredCapsule.id}`)}
+        />
+      )}
     </div>
   )
 }

@@ -8,7 +8,7 @@ interface ARSceneProps {
   userLng: number
   deviceAlpha: number | null
   capsules: Capsule[]
-  onCapsuleClick?: (id: string) => void
+  onCapsuleClick: (id: string) => void
 }
 
 export default function ARScene({
@@ -16,7 +16,7 @@ export default function ARScene({
   userLng,
   deviceAlpha,
   capsules,
-  onCapsuleClick: _onCapsuleClick,
+  onCapsuleClick,
 }: ARSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const sceneRef = useRef<THREE.Scene | null>(null)
@@ -151,12 +151,46 @@ export default function ARScene({
         }
       })
 
+      // Raycasting for click detection
+      const raycaster = new THREE.Raycaster()
+      const mouse = new THREE.Vector2()
+
+      const handleClick = (event: MouseEvent) => {
+        // Calculate mouse position in normalized device coordinates
+        const rect = renderer.domElement.getBoundingClientRect()
+        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+
+        // Update the picking ray with the camera and mouse position
+        raycaster.setFromCamera(mouse, camera)
+
+        // Calculate objects intersecting the picking ray
+        const intersects = raycaster.intersectObjects(
+          Array.from(capsuleMeshesRef.current.values()).filter(mesh => mesh.visible),
+          true
+        )
+
+        if (intersects.length > 0) {
+          const clickedGroup = intersects[0].object.parent as THREE.Group
+          if (clickedGroup && clickedGroup.userData.capsuleId) {
+            onCapsuleClick(clickedGroup.userData.capsuleId)
+          }
+        }
+      }
+
+      // Attach event listener
+      renderer.domElement.addEventListener('click', handleClick)
+
       renderer.render(scene, camera)
     }
     animate()
 
     return () => {
       cancelAnimationFrame(animFrameRef.current)
+      // Clean up event listener
+      if (rendererRef.current?.domElement) {
+        rendererRef.current.domElement.removeEventListener('click', handleClick)
+      }
     }
   }, [userLat, userLng, deviceAlpha, capsules])
 
