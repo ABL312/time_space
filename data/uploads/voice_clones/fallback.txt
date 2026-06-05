@@ -1,0 +1,2 @@
+This is a fallback audio file for the voice cloning service.
+When ElevenLabs API is not available, this file will be returned as a placeholder.

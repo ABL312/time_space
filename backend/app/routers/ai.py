@@ -104,56 +104,17 @@ async def voice_clone(
     Clone voice from audio sample and generate speech.
     Returns mock response if ElevenLabs API key not configured.
     """
-    if not ELEVENLABS_API_KEY:
-        return VoiceCloneResponse(
-            voice_id="mock-voice-id",
-            audio_url="/uploads/voice_clones/demo.mp3",
-            duration_seconds=len(text) * 0.15,
-        )
-
-    try:
-        from elevenlabs import ElevenLabs
-        client = ElevenLabs(api_key=ELEVENLABS_API_KEY)
-
-        # Upload voice sample
-        sample_content = await sample.read()
-        voice = client.voices.add(
-            name="temp_clone",
-            files=[(sample.filename or "sample.webm", sample_content, sample.content_type or "audio/webm")],
-        )
-
-        # Generate speech
-        audio = client.text_to_speech.convert(
-            voice_id=voice.voice_id,
-            text=text,
-            model_id="eleven_multilingual_v2",
-            voice_settings={
-                "stability": 0.5,
-                "similarity_boost": 0.8,
-                "style": 0.3,
-            },
-        )
-
-        # Save audio file
-        import uuid
-        audio_filename = f"{uuid.uuid4()}.mp3"
-        audio_path = os.path.join(
-            os.getenv("UPLOAD_DIR", "./data/uploads"), "voice_clones", audio_filename
-        )
-        os.makedirs(os.path.dirname(audio_path), exist_ok=True)
-        with open(audio_path, "wb") as f:
-            for chunk in audio:
-                f.write(chunk)
-
-        return VoiceCloneResponse(
-            voice_id=voice.voice_id,
-            audio_url=f"/uploads/voice_clones/{audio_filename}",
-            duration_seconds=0,  # Will be calculated by frontend
-        )
-    except Exception as e:
-        print(f"⚠️ ElevenLabs API error: {e}")
-        return VoiceCloneResponse(
-            voice_id="error",
-            audio_url="/uploads/voice_clones/demo.mp3",
-            duration_seconds=0,
-        )
+    # Import our new service
+    from ..services.voice_clone_service import VoiceCloneService
+    
+    # Initialize service
+    voice_service = VoiceCloneService()
+    
+    # Read sample content
+    sample_content = await sample.read()
+    sample_filename = sample.filename or "sample.wav"
+    
+    # Process with our service
+    result = await voice_service.clone_and_speak(sample_content, sample_filename, text)
+    
+    return VoiceCloneResponse(**result)
