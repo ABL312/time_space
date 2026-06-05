@@ -1,9 +1,7 @@
 import { useEffect, useRef } from 'react'
-import mapboxgl from 'mapbox-gl'
-import 'mapbox-gl/dist/mapbox-gl.css'
+import L from 'leaflet'
+import 'leaflet/dist/leaflet.css'
 import type { Capsule } from '../types'
-
-mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_TOKEN || 'pk.placeholder'
 
 interface MapViewProps {
   latitude: number
@@ -19,75 +17,90 @@ export default function MapView({
   onCapsuleClick,
 }: MapViewProps) {
   const mapContainer = useRef<HTMLDivElement>(null)
-  const map = useRef<mapboxgl.Map | null>(null)
-  const markersRef = useRef<mapboxgl.Marker[]>([])
+  const map = useRef<L.Map | null>(null)
+  const markersRef = useRef<L.LayerGroup | null>(null)
 
+  // Initialize map
   useEffect(() => {
     if (!mapContainer.current || map.current) return
-    map.current = new mapboxgl.Map({
-      container: mapContainer.current,
-      style: 'mapbox://styles/mapbox/dark-v11',
-      center: [longitude, latitude],
+
+    map.current = L.map(mapContainer.current, {
+      center: [latitude, longitude],
       zoom: 15,
+      zoomControl: false,
       attributionControl: true,
     })
-    map.current.addControl(new mapboxgl.NavigationControl(), 'top-right')
-    return () => { map.current?.remove(); map.current = null }
+
+    // CartoDB Dark Matter — 暗色主题，免费无需 token
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 20,
+    }).addTo(map.current)
+
+    // Zoom control top-right
+    L.control.zoom({ position: 'topright' }).addTo(map.current)
+
+    // Layer group for markers
+    markersRef.current = L.layerGroup().addTo(map.current)
+
+    return () => {
+      map.current?.remove()
+      map.current = null
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Fly to position on change
   useEffect(() => {
     if (!map.current) return
-    map.current.flyTo({ center: [longitude, latitude], duration: 1500, essential: true })
+    map.current.flyTo([latitude, longitude], 15, { duration: 1.5 })
   }, [latitude, longitude])
 
+  // Update markers
   useEffect(() => {
-    if (!map.current) return
-    markersRef.current.forEach((m) => m.remove())
-    markersRef.current = []
+    if (!map.current || !markersRef.current) return
+    markersRef.current.clearLayers()
 
-    // User position - cyan square with glow
-    const userEl = document.createElement('div')
-    userEl.style.cssText = `
-      width: 10px; height: 10px;
-      background: #22d3ee;
-      box-shadow: 0 0 12px 3px rgba(34,211,238,0.4);
-    `
-    markersRef.current.push(
-      new mapboxgl.Marker({ element: userEl }).setLngLat([longitude, latitude]).addTo(map.current!)
-    )
+    // User position — cyan dot with glow
+    const userIcon = L.divIcon({
+      className: '',
+      html: `<div style="
+        width: 12px; height: 12px;
+        background: #22d3ee;
+        box-shadow: 0 0 14px 4px rgba(34,211,238,0.5);
+        border-radius: 50%;
+      "></div>`,
+      iconSize: [12, 12],
+      iconAnchor: [6, 6],
+    })
+    L.marker([latitude, longitude], { icon: userIcon }).addTo(markersRef.current)
 
     // Capsule markers
     capsules.forEach((capsule) => {
       const isHot = (capsule.match_score ?? 0) > 50
-      const size = isHot ? 12 : 8
+      const size = isHot ? 14 : 10
+      const color = isHot ? '#f5a623' : 'rgba(245,166,35,0.5)'
+      const glow = isHot ? 'box-shadow: 0 0 12px 3px rgba(245,166,35,0.5);' : ''
 
-      const el = document.createElement('div')
-      el.style.cssText = `
-        width: ${size}px; height: ${size}px;
-        background: ${isHot ? '#f5a623' : 'rgba(245,166,35,0.5)'};
-        cursor: pointer;
-        position: relative;
-        ${isHot ? 'box-shadow: 0 0 10px 2px rgba(245,166,35,0.5);' : ''}
-      `
-      el.addEventListener('click', () => onCapsuleClick?.(capsule))
+      const capsuleIcon = L.divIcon({
+        className: '',
+        html: `<div style="
+          width: ${size}px; height: ${size}px;
+          background: ${color};
+          border-radius: 50%;
+          cursor: pointer;
+          ${glow}
+        "></div>`,
+        iconSize: [size, size],
+        iconAnchor: [size / 2, size / 2],
+      })
 
-      // Pulse ring for hot capsules
-      if (isHot) {
-        const ring = document.createElement('div')
-        ring.style.cssText = `
-          position: absolute; inset: -6px;
-          border: 1px solid rgba(245,166,35,0.5);
-          animation: signal-ping 2s cubic-bezier(0,0,0.2,1) infinite;
-        `
-        el.appendChild(ring)
-      }
-
-      markersRef.current.push(
-        new mapboxgl.Marker({ element: el }).setLngLat([capsule.longitude, capsule.latitude]).addTo(map.current!)
-      )
+      const marker = L.marker([capsule.latitude, capsule.longitude], { icon: capsuleIcon })
+      marker.on('click', () => onCapsuleClick?.(capsule))
+      marker.addTo(markersRef.current!)
     })
-  }, [capsules, longitude, latitude, onCapsuleClick])
+  }, [capsules, latitude, longitude, onCapsuleClick])
 
   return <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
 }

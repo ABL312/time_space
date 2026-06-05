@@ -40,10 +40,10 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/api\.mapbox\.com\/.*/i,
+            urlPattern: ({ url }) => url.pathname.startsWith('/api/'),
             handler: 'CacheFirst',
             options: {
-              cacheName: 'mapbox-cache',
+              cacheName: 'api-cache',
               expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 7 },
             },
           },
