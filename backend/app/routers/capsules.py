@@ -5,6 +5,7 @@ import asyncio
 import uuid
 import json
 from typing import Optional
+from datetime import datetime
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 
 from ..database import get_db
@@ -77,6 +78,7 @@ async def create_capsule(
     target_user_id: Optional[str] = Form(None),
     author_id: Optional[str] = Form(None),
     voice_clone_url: Optional[str] = Form(None),
+    unlock_at: Optional[str] = Form(None),  # Time lock feature
     photos: list[UploadFile] = File(default=[]),
     voice: Optional[UploadFile] = File(None),
 ):
@@ -86,15 +88,23 @@ async def create_capsule(
 
     db = await get_db()
     try:
+        # Parse unlock_at if provided
+        unlock_at_dt = None
+        if unlock_at:
+            try:
+                unlock_at_dt = datetime.fromisoformat(unlock_at.replace("Z", "+00:00"))
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid unlock_at format. Use ISO format.")
+
         # Insert capsule
         await db.execute(
             """
             INSERT INTO capsules (id, author_id, latitude, longitude, geohash,
-                message, mood_tag, visibility, target_user_id, voice_clone_url)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                message, mood_tag, visibility, target_user_id, voice_clone_url, unlock_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (capsule_id, author_id, latitude, longitude, geohash,
-             message, mood_tag, visibility, target_user_id, voice_clone_url),
+             message, mood_tag, visibility, target_user_id, voice_clone_url, unlock_at_dt),
         )
 
         # Handle photo uploads via StorageService
@@ -205,8 +215,11 @@ async def get_nearby(
     """Get nearby capsules sorted by distance, with recommendations."""
     db = await get_db()
     try:
-        # Find nearby capsules
-        capsules = await find_nearby_capsules(db, lat, lng, radius_m=radius)
+        # Find nearby capsules (only unlocked or expired)
+        current_time = datetime.utcnow().isoformat()
+        capsules = await find_nearby_capsules(db, lat, lng, radius_m=radius, 
+                                            additional_where="AND (unlock_at IS NULL OR unlock_at <= ?)",
+                                            additional_params=(current_time,))
 
         # Get user interest tags for ranking
         user_interest_tags = []
@@ -284,13 +297,6 @@ async def get_capsule(capsule_id: str):
     """Get capsule detail by ID. Auto-increments open_count."""
     db = await get_db()
     try:
-        # Increment open_count
-        await db.execute(
-            "UPDATE capsules SET open_count = open_count + 1 WHERE id = ?",
-            (capsule_id,),
-        )
-        await db.commit()
-
         cursor = await db.execute(
             """
             SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
@@ -305,6 +311,28 @@ async def get_capsule(capsule_id: str):
             raise HTTPException(status_code=404, detail="Capsule not found")
 
         capsule = _parse_capsule_row(dict(row))
+        
+        # Check if capsule is time-locked
+        unlock_at = capsule.get("unlock_at")
+        if unlock_at:
+            unlock_datetime = datetime.fromisoformat(unlock_at.replace("Z", "+00:00"))
+            current_datetime = datetime.utcnow()
+            
+            if unlock_datetime > current_datetime:
+                # Capsule is locked, return special response
+                countdown_seconds = int((unlock_datetime - current_datetime).total_seconds())
+                return {
+                    "locked": True,
+                    "unlock_at": unlock_at,
+                    "countdown_seconds": countdown_seconds
+                }
+
+        # Increment open_count for unlocked capsules
+        await db.execute(
+            "UPDATE capsules SET open_count = open_count + 1 WHERE id = ?",
+            (capsule_id,),
+        )
+        await db.commit()
 
         # Fetch media
         cursor = await db.execute(
@@ -460,6 +488,11 @@ async def search_capsules(
             
             base_query += " AND c.latitude BETWEEN ? AND ? AND c.longitude BETWEEN ? AND ?"
             params.extend([min_lat, max_lat, min_lng, max_lng])
+        
+        # Only show unlocked capsules
+        current_time = datetime.utcnow().isoformat()
+        base_query += " AND (c.unlock_at IS NULL OR c.unlock_at <= ?)"
+        params.append(current_time)
         
         base_query += " ORDER BY c.created_at DESC LIMIT 100"
         

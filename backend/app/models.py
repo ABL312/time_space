@@ -46,6 +46,7 @@ class CapsuleCreate(BaseModel):
     mood_tag: Optional[str] = None
     visibility: str = "public"
     target_user_id: Optional[str] = None
+    unlock_at: Optional[str] = None  # ISO format datetime string
 
 
 class CapsuleResponse(BaseModel):
@@ -67,6 +68,7 @@ class CapsuleResponse(BaseModel):
     emotion_summary: Optional[str] = None
     mood_tag: Optional[str] = None
     visibility: str = "public"
+    unlock_at: Optional[str] = None  # ISO format datetime string
     open_count: int = 0
     created_at: str
     media: Optional[list[dict]] = None
