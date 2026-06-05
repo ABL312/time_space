@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Achievement } from '../hooks/useAchievements';
+import type { Achievement } from '../hooks/useAchievements';
 
 interface AchievementPanelProps {
   achievements: Achievement[];

@@ -24,6 +24,14 @@ export default function CapsuleDetailPage() {
   // Favorite states
   const [isFavorite, setIsFavorite] = useState(false)
   const [isTogglingFavorite, setIsTogglingFavorite] = useState(false)
+  
+  // Time lock states
+  const [timeLockData, setTimeLockData] = useState<{
+    locked: boolean
+    unlock_at?: string
+    countdown_seconds?: number
+  } | null>(null)
+  const [countdown, setCountdown] = useState<string>('')
 
   useEffect(() => {
     if (!id) return
@@ -57,6 +65,46 @@ export default function CapsuleDetailPage() {
         .catch((err) => console.error('Failed to fetch favorite status:', err))
     }
   }, [id, user, selectedCapsule])
+
+  // Handle time lock countdown
+  useEffect(() => {
+    if (selectedCapsule?.unlock_at) {
+      // Set initial time lock data
+      const locked = new Date() < new Date(selectedCapsule.unlock_at!)
+      setTimeLockData({
+        locked,
+        unlock_at: selectedCapsule.unlock_at,
+        countdown_seconds: locked 
+          ? Math.max(0, Math.floor((new Date(selectedCapsule.unlock_at!).getTime() - Date.now()) / 1000))
+          : undefined
+      })
+      
+      // If locked, start countdown
+      if (locked) {
+        const interval = setInterval(() => {
+          const remaining = Math.max(0, Math.floor((new Date(selectedCapsule.unlock_at!).getTime() - Date.now()) / 1000))
+          setTimeLockData(prev => prev ? {...prev, countdown_seconds: remaining} : null)
+          
+          if (remaining <= 0) {
+            // Unlock when countdown reaches zero
+            setTimeLockData(prev => prev ? {...prev, locked: false} : null)
+            clearInterval(interval)
+            // Refresh the page to show unlocked content
+            window.location.reload()
+          } else {
+            // Format countdown as DD:HH:MM:SS
+            const days = Math.floor(remaining / 86400)
+            const hours = Math.floor((remaining % 86400) / 3600)
+            const minutes = Math.floor((remaining % 3600) / 60)
+            const seconds = remaining % 60
+            setCountdown(`${days.toString().padStart(2, '0')}:${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`)
+          }
+        }, 1000)
+        
+        return () => clearInterval(interval)
+      }
+    }
+  }, [selectedCapsule])
 
   useEffect(() => {
     if (selectedCapsule) {
@@ -173,38 +221,67 @@ export default function CapsuleDetailPage() {
           </div>
         </section>
 
-        {/* ── MESSAGE ARCHIVE ── */}
-        <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.1s' }}>
-          <div className="label mb-2 flex items-center gap-2">
-            <span className="inline-block w-2 h-px bg-signal-dim" />
-            MESSAGE_CONTENT
-          </div>
-          <div className="panel corners p-5">
-            <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-slate-200">
-              {c.message}
-            </p>
-            {c.emotion_intensity != null && (
-              <div className="mt-4 pt-3 border-t border-border">
-                <div className="flex items-center gap-3">
-                  <span className="label">INTENSITY</span>
-                  <div className="flex-1 h-px bg-surface-light relative">
-                    <div
-                      className="absolute left-0 top-0 h-px bg-gradient-to-r from-signal to-capsule"
-                      style={{ width: `${Math.round(c.emotion_intensity * 100)}%` }}
-                    />
-                  </div>
-                  <span className="data-value text-xs font-mono">
-                    {Math.round(c.emotion_intensity * 100)}%
-                  </span>
-                </div>
+        {/* ── TIME LOCK ── */}
+        {timeLockData?.locked && (
+          <section className={`mb-6 text-center ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.1s' }}>
+            <div className="label mb-2 flex items-center justify-center gap-2">
+              <span className="inline-block w-2 h-px bg-signal-dim" />
+              TIME_LOCKED
+            </div>
+            <div className="panel corners p-6">
+              <div className="w-16 h-16 mx-auto mb-4 text-slate-600">
+                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                </svg>
               </div>
-            )}
-          </div>
-        </section>
+              <h3 className="text-lg font-medium text-white mb-2">胶囊已锁定</h3>
+              <p className="text-slate-400 mb-4">
+                将于 {formatUnlockTime(timeLockData.unlock_at!)} 解锁
+              </p>
+              <div className="text-2xl font-mono font-bold text-signal mb-2">
+                {countdown}
+              </div>
+              <p className="text-xs text-slate-500">
+                倒计时结束后自动解锁
+              </p>
+            </div>
+          </section>
+        )}
+
+        {/* ── MESSAGE ARCHIVE ── */}
+        {(!timeLockData || !timeLockData.locked) && (
+          <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.2s' }}>
+            <div className="label mb-2 flex items-center gap-2">
+              <span className="inline-block w-2 h-px bg-signal-dim" />
+              MESSAGE_CONTENT
+            </div>
+            <div className="panel corners p-5">
+              <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-slate-200">
+                {c.message}
+              </p>
+              {c.emotion_intensity != null && (
+                <div className="mt-4 pt-3 border-t border-border">
+                  <div className="flex items-center gap-3">
+                    <span className="label">INTENSITY</span>
+                    <div className="flex-1 h-px bg-surface-light relative">
+                      <div
+                        className="absolute left-0 top-0 h-px bg-gradient-to-r from-signal to-capsule"
+                        style={{ width: `${Math.round(c.emotion_intensity * 100)}%` }}
+                      />
+                    </div>
+                    <span className="data-value text-xs font-mono">
+                      {Math.round(c.emotion_intensity * 100)}%
+                    </span>
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {/* ── EMOTION TAGS ── */}
-        {c.emotion_tags && c.emotion_tags.length > 0 && (
-          <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.2s' }}>
+        {(!timeLockData || !timeLockData.locked) && c.emotion_tags && c.emotion_tags.length > 0 && (
+          <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.3s' }}>
             <div className="label mb-2 flex items-center gap-2">
               <span className="inline-block w-2 h-px bg-signal-dim" />
               EMOTION_ANALYSIS
@@ -228,8 +305,8 @@ export default function CapsuleDetailPage() {
         )}
 
         {/* ── PHOTO ARCHIVE ── */}
-        {photos.length > 0 && (
-          <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.3s' }}>
+        {(!timeLockData || !timeLockData.locked) && photos.length > 0 && (
+          <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.4s' }}>
             <div className="label mb-2 flex items-center gap-2">
               <span className="inline-block w-2 h-px bg-signal-dim" />
               PHOTO_ARCHIVE [{photos.length}]
@@ -239,8 +316,8 @@ export default function CapsuleDetailPage() {
         )}
 
         {/* ── VOICE DATA ── */}
-        {(c.voice_clone_url || c.voice_url) && (
-          <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.4s' }}>
+        {(!timeLockData || !timeLockData.locked) && (c.voice_clone_url || c.voice_url) && (
+          <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.5s' }}>
             {c.voice_clone_url && (
               <div className="mb-3">
                 <div className="label mb-2 flex items-center gap-2">
@@ -263,7 +340,7 @@ export default function CapsuleDetailPage() {
         )}
 
         {/* ── LOCATION DATA ── */}
-        <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.5s' }}>
+        <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.6s' }}>
           <div className="label mb-2 flex items-center gap-2">
             <span className="inline-block w-2 h-px bg-signal-dim" />
             LOCATION_DATA
@@ -289,68 +366,72 @@ export default function CapsuleDetailPage() {
         </section>
 
         {/* ── RESPONSES ── */}
-        <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.6s' }}>
-          <div className="label mb-2 flex items-center gap-2">
-            <span className="inline-block w-2 h-px bg-signal-dim" />
-            RESPONSES [{responses.length}]
-          </div>
-          <div className="space-y-4">
-            {/* Response list */}
-            {responses.length > 0 ? (
-              responses.map((response) => (
-                <div key={response.id} className="panel p-4">
-                  <div className="flex items-start justify-between mb-2">
-                    <span className="font-medium text-white">{response.nickname}</span>
-                    <span className="data text-xs">{formatDate(response.created_at)}</span>
-                  </div>
-                  <p className="text-sm text-slate-300 whitespace-pre-wrap">{response.content}</p>
-                </div>
-              ))
-            ) : (
-              <div className="panel p-4 text-center text-slate-500">
-                <p>还没有人回应，来做第一个留言的人吧！</p>
-              </div>
-            )}
-
-            {/* Response input */}
-            <div className="panel p-4">
-              <textarea
-                value={newResponse}
-                onChange={(e) => setNewResponse(e.target.value)}
-                placeholder="写下你的回应..."
-                maxLength={500}
-                rows={3}
-                className="w-full px-3 py-2 bg-surface border border-border text-white placeholder-slate-600 focus:outline-none focus:border-signal transition-colors resize-none text-sm"
-              />
-              <div className="flex justify-between items-center mt-2">
-                <span className="data">{newResponse.length}/500</span>
-                <button
-                  onClick={handleResponseSubmit}
-                  disabled={!newResponse.trim() || isSubmittingResponse}
-                  className={`btn px-4 py-1.5 text-xs font-mono tracking-wider border transition-all ${
-                    newResponse.trim() && !isSubmittingResponse
-                      ? 'border-primary/40 bg-primary/5 text-primary-light hover:bg-primary/10'
-                      : 'border-border text-slate-600 cursor-not-allowed'
-                  }`}
-                >
-                  {isSubmittingResponse ? 'SENDING...' : 'SEND'}
-                </button>
-              </div>
-              {responseError && <p className="data text-data-bad mt-2 text-center">{responseError}</p>}
+        {(!timeLockData || !timeLockData.locked) && (
+          <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.7s' }}>
+            <div className="label mb-2 flex items-center gap-2">
+              <span className="inline-block w-2 h-px bg-signal-dim" />
+              RESPONSES [{responses.length}]
             </div>
-          </div>
-        </section>
+            <div className="space-y-4">
+              {/* Response list */}
+              {responses.length > 0 ? (
+                responses.map((response) => (
+                  <div key={response.id} className="panel p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <span className="font-medium text-white">{response.nickname}</span>
+                      <span className="data text-xs">{formatDate(response.created_at)}</span>
+                    </div>
+                    <p className="text-sm text-slate-300 whitespace-pre-wrap">{response.content}</p>
+                  </div>
+                ))
+              ) : (
+                <div className="panel p-4 text-center text-slate-500">
+                  <p>还没有人回应，来做第一个留言的人吧！</p>
+                </div>
+              )}
+
+              {/* Response input */}
+              <div className="panel p-4">
+                <textarea
+                  value={newResponse}
+                  onChange={(e) => setNewResponse(e.target.value)}
+                  placeholder="写下你的回应..."
+                  maxLength={500}
+                  rows={3}
+                  className="w-full px-3 py-2 bg-surface border border-border text-white placeholder-slate-600 focus:outline-none focus:border-signal transition-colors resize-none text-sm"
+                />
+                <div className="flex justify-between items-center mt-2">
+                  <span className="data">{newResponse.length}/500</span>
+                  <button
+                    onClick={handleResponseSubmit}
+                    disabled={!newResponse.trim() || isSubmittingResponse}
+                    className={`btn px-4 py-1.5 text-xs font-mono tracking-wider border transition-all ${
+                      newResponse.trim() && !isSubmittingResponse
+                        ? 'border-primary/40 bg-primary/5 text-primary-light hover:bg-primary/10'
+                        : 'border-border text-slate-600 cursor-not-allowed'
+                    }`}
+                  >
+                    {isSubmittingResponse ? 'SENDING...' : 'SEND'}
+                  </button>
+                </div>
+                {responseError && <p className="data text-data-bad mt-2 text-center">{responseError}</p>}
+              </div>
+            </div>
+          </section>
+        )}
 
         {/* ── ACTION ── */}
-        <div className={`${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.7s' }}>
-          <div className="divider mb-5" />
-          <button
-            onClick={() => navigate(`/create?reply_to=${c.id}`)}
-            className="btn w-full py-3.5 border border-capsule/30 bg-capsule/5 text-capsule text-sm font-medium tracking-wide hover:bg-capsule/10 transition-colors"
-          >
-            LEAVE A RESPONSE
-          </button>
-        </div>
+        {(!timeLockData || !timeLockData.locked) && (
+          <div className={`${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.8s' }}>
+            <div className="divider mb-5" />
+            <button
+              onClick={() => navigate(`/create?reply_to=${c.id}`)}
+              className="btn w-full py-3.5 border border-capsule/30 bg-capsule/5 text-capsule text-sm font-medium tracking-wide hover:bg-capsule/10 transition-colors"
+            >
+              LEAVE A RESPONSE
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
@@ -542,4 +623,15 @@ function formatDist(m: number): string {
 function fmtTime(s: number): string {
   if (!s || isNaN(s)) return '0:00'
   return `${Math.floor(s / 60)}:${String(Math.floor(s % 60)).padStart(2, '0')}`
+}
+
+function formatUnlockTime(dateString: string): string {
+  const date = new Date(dateString)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
 }

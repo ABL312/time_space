@@ -16,7 +16,7 @@ const DanmakuLayer: React.FC = () => {
 
   // Fetch recent capsules
   useEffect(() => {
-    let intervalId: NodeJS.Timeout;
+    let intervalId: any;
 
     const fetchRecentCapsules = async () => {
       try {
@@ -35,12 +35,12 @@ const DanmakuLayer: React.FC = () => {
                 : capsule.message!;
               
               // Get emotion tag
-              const emotion = capsule.emotion_tag || '💭';
+              const emotion = (capsule.emotion_tags && capsule.emotion_tags[0]) || '💭';
               
               return {
                 id: `dm-${Date.now()}-${danmakuIdRef.current++}`,
                 text: `${emotion} ${text}`,
-                emotion: capsule.emotion_tag || '',
+                emotion: (capsule.emotion_tags && capsule.emotion_tags[0]) || '',
                 top: Math.random() * 80 + 10, // Random position between 10% and 90%
               };
             });
@@ -116,16 +116,18 @@ const DanmakuLayer: React.FC = () => {
         <span className="data">弹幕</span>
       </button>
 
-      <style jsx>{`
-        @keyframes danmaku-slide {
-          from {
-            transform: translateX(0);
+      <style>
+        {`
+          @keyframes danmaku-slide {
+            from {
+              transform: translateX(0);
+            }
+            to {
+              transform: translateX(-100vw);
+            }
           }
-          to {
-            transform: translateX(-100vw);
-          }
-        }
-      `}</style>
+        `}
+      </style>
     </div>
   );
 };

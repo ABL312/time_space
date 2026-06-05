@@ -58,6 +58,7 @@ export interface Capsule {
   open_count: number
   created_at: string
   expires_at?: string
+  unlock_at?: string
   media?: Media[]
   // Computed fields from nearby query
   distance_m?: number

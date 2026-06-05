@@ -45,6 +45,39 @@ export default function HomePage() {
 
   const radius = cap.useExpandedGPS ? 5000 : 1200
 
+  const handleSearch = async () => {
+    if (!searchQuery.trim() && !selectedTag) return
+    
+    setIsSearching(true)
+    setSearchError(null)
+    
+    try {
+      const params: any = {}
+      if (searchQuery.trim()) params.q = searchQuery.trim()
+      if (selectedTag) params.tag = selectedTag
+      if (effectiveLatitude && effectiveLongitude) {
+        params.lat = effectiveLatitude
+        params.lng = effectiveLongitude
+        params.radius = radius
+      }
+      
+      const results = await searchApi.search(params)
+      setSearchResults(results)
+    } catch (err: any) {
+      setSearchError(err.message || '搜索失败')
+      console.error('Search error:', err)
+    } finally {
+      setIsSearching(false)
+    }
+  }
+
+  const clearSearch = () => {
+    setSearchQuery('')
+    setSelectedTag(null)
+    setSearchResults([])
+    setSearchError(null)
+  }
+
   useEffect(() => {
     if (effectiveLatitude && effectiveLongitude && user) {
       fetchNearby({ lat: effectiveLatitude, lng: effectiveLongitude, radius, user_id: user.id })
@@ -63,17 +96,143 @@ export default function HomePage() {
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-void">
       {/* Map */}
-      <MapView
-        latitude={effectiveLatitude ?? 31.0282}
-        longitude={effectiveLongitude ?? 121.4346}
-        capsules={nearby ? [...nearby.recommended, ...nearby.others] : []}
-      />
+      {searchResults.length === 0 && (
+        <MapView
+          latitude={effectiveLatitude ?? 31.0282}
+          longitude={effectiveLongitude ?? 121.4346}
+          capsules={nearby ? [...nearby.recommended, ...nearby.others] : []}
+        />
+      )}
+
+      {/* Search Results */}
+      {searchResults.length > 0 && (
+        <div className="absolute inset-0 pt-24 pb-24 px-3 z-10 overflow-y-auto">
+          <div className="space-y-3">
+            {searchResults.map((capsule) => (
+              <div 
+                key={capsule.id}
+                onClick={() => navigate(`/capsule/${capsule.id}`)}
+                className="panel p-4 cursor-pointer hover:border-signal/30 transition-colors"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-medium text-white truncate">
+                        {capsule.author?.name || '匿名发送者'}
+                      </span>
+                      <span className="data text-xs">
+                        {capsule.distance_m != null ? (
+                          `${capsule.distance_m < 1000 ? `${Math.round(capsule.distance_m)}m` : `${(capsule.distance_m / 1000).toFixed(1)}km`}`
+                        ) : (
+                          '未知距离'
+                        )}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-300 line-clamp-2">
+                      {capsule.message}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {capsule.emotion_tags?.slice(0, 3).map((tag) => (
+                        <span 
+                          key={tag}
+                          className="px-1.5 py-0.5 text-xs font-mono border border-primary/20 text-primary-light bg-primary/5"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  {capsule.media && capsule.media.length > 0 && (
+                    <div className="w-16 h-16 border border-border flex-shrink-0">
+                      <img 
+                        src={capsule.media[0].thumbnail_url || capsule.media[0].url} 
+                        alt=""
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          const target = e.target as HTMLImageElement
+                          target.style.display = 'none'
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Danmaku Layer */}
       <DanmakuLayer />
 
       {/* ── TOP HUD OVERLAY ── */}
       <div className="absolute top-3 left-3 right-3 z-20 space-y-2">
+        {/* Search bar */}
+        <div className="hud p-2 flex items-center gap-2">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            placeholder="搜索胶囊..."
+            className="flex-1 bg-transparent border-none text-white placeholder-slate-500 focus:outline-none text-sm"
+          />
+          {searchQuery || selectedTag || searchResults.length > 0 ? (
+            <button 
+              onClick={clearSearch}
+              className="btn w-6 h-6 flex items-center justify-center text-slate-400 hover:text-signal"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          ) : (
+            <button 
+              onClick={handleSearch}
+              disabled={isSearching || (!searchQuery.trim() && !selectedTag)}
+              className="btn w-6 h-6 flex items-center justify-center text-slate-400 hover:text-signal disabled:opacity-50"
+            >
+              {isSearching ? (
+                <div className="w-4 h-4 border border-signal border-t-transparent animate-spin" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+              )}
+            </button>
+          )}
+        </div>
+        
+        {/* Search error */}
+        {searchError && (
+          <div className="hud px-3 py-2 border-data-bad/20 flex items-center gap-2">
+            <div className="w-1.5 h-1.5 bg-data-bad" />
+            <span className="data text-data-bad">{searchError}</span>
+          </div>
+        )}
+        
+        {/* Tag filters */}
+        {searchResults.length > 0 && (
+          <div className="flex gap-1.5 overflow-x-auto pb-1">
+            {['怀旧', '温暖', '感恩', '浪漫', '思念', '快乐', '遗憾', '鼓励'].map((tag) => (
+              <button
+                key={tag}
+                onClick={() => {
+                  setSelectedTag(selectedTag === tag ? null : tag)
+                  setTimeout(handleSearch, 0)
+                }}
+                className={`btn flex-shrink-0 px-2.5 py-1 text-xs border transition-all ${
+                  selectedTag === tag
+                    ? 'border-primary/40 bg-primary/5 text-primary-light'
+                    : 'border-border text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {tag}
+              </button>
+            ))}
+          </div>
+        )}
+        
         {/* Coordinate readout */}
         {effectiveLatitude && effectiveLongitude && (
           <div className="hud px-3 py-2 inline-flex items-center gap-3">
