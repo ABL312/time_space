@@ -15,6 +15,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.services.geohash_service import encode
+from app.database import SCHEMA_SQL
 
 
 def get_db_connection():
@@ -23,6 +24,11 @@ def get_db_connection():
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
+    
+    # 初始化数据库表结构
+    conn.executescript(SCHEMA_SQL)
+    conn.commit()
+    
     return conn
 
 

@@ -76,6 +76,7 @@ async def create_capsule(
     visibility: str = Form("public"),
     target_user_id: Optional[str] = Form(None),
     author_id: Optional[str] = Form(None),
+    voice_clone_url: Optional[str] = Form(None),
     photos: list[UploadFile] = File(default=[]),
     voice: Optional[UploadFile] = File(None),
 ):
@@ -89,11 +90,11 @@ async def create_capsule(
         await db.execute(
             """
             INSERT INTO capsules (id, author_id, latitude, longitude, geohash,
-                message, mood_tag, visibility, target_user_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                message, mood_tag, visibility, target_user_id, voice_clone_url)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (capsule_id, author_id, latitude, longitude, geohash,
-             message, mood_tag, visibility, target_user_id),
+             message, mood_tag, visibility, target_user_id, voice_clone_url),
         )
 
         # Handle photo uploads via StorageService
@@ -350,6 +351,16 @@ async def reply_to_capsule(
 
         await db.commit()
 
-        return {"id": reply_id, "message": "Reply created", "capsule_id": reply_id}
+        # 查询刚创建的 reply
+        cursor = await db.execute("SELECT * FROM capsules WHERE id = ?", (reply_id,))
+        row = await cursor.fetchone()
+        capsule = _parse_capsule_row(dict(row))
+
+        # 查询 media
+        cursor = await db.execute("SELECT * FROM media WHERE capsule_id = ? ORDER BY sort_order", (reply_id,))
+        media_rows = await cursor.fetchall()
+        capsule["media"] = [dict(m) for m in media_rows]
+
+        return capsule
     finally:
         await db.close()
