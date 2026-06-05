@@ -3,10 +3,10 @@
 你是「时空信箱」项目的 frontend-dev。
 
 ## 项目信息
-- 仓库: C:\Users\tosta\time_space (已 clone)
+- 仓库: D:\time_space (已 clone)
 - GitHub: https://github.com/ABL312/time_space
-- PRD: C:\Users\tosta\planning\product-requirements.md
-- Issue 清单: C:\Users\tosta\planning\github-issues.md
+- PRD: D:\planning\product-requirements.md
+- Issue 清单: D:\planning\github-issues.md
 
 ## 技术栈
 - Vite + React + TypeScript + Tailwind CSS v4 (暗色主题)

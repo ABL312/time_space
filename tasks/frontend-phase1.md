@@ -51,7 +51,7 @@
 - [ ] 所有功能在暗色主题下美观
 
 ### 工作流
-1. 先 cd 到 C:/Users/tosta/time_space && git pull
+1. 先 cd 到 D:/time_space && git pull
 2. 读取现有 CapsuleDetailPage.tsx 和 index.css
 3. 实现上述增强
 4. git add . && git commit -m "feat(frontend): enhance capsule detail page with animations, fullscreen photos, custom audio player"
