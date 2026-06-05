@@ -24,61 +24,37 @@ export default function CreatePage() {
 
   const toggleMoodTag = (tag: string) => {
     setMoodTags((prev) =>
-      prev.includes(tag)
-        ? prev.filter((t) => t !== tag)
-        : prev.length < 3
-          ? [...prev, tag]
-          : prev
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : prev.length < 3 ? [...prev, tag] : prev
     )
   }
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
-    if (files.length + photos.length > 5) {
-      setError('最多上传5张照片')
-      return
-    }
+    if (files.length + photos.length > 5) { setError('最多上传5张照片'); return }
     setPhotos((prev) => [...prev, ...files])
   }
 
-  const removePhoto = (index: number) => {
-    setPhotos((prev) => prev.filter((_, i) => i !== index))
-  }
+  const removePhoto = (index: number) => setPhotos((prev) => prev.filter((_, i) => i !== index))
 
   const startRecording = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+      const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' })
       const chunks: Blob[] = []
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunks.push(e.data)
-      }
-
-      mediaRecorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' })
-        setVoiceBlob(blob)
+      mr.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
+      mr.onstop = () => {
+        setVoiceBlob(new Blob(chunks, { type: 'audio/webm' }))
         stream.getTracks().forEach((t) => t.stop())
       }
-
-      mediaRecorder.start()
-      mediaRecorderRef.current = mediaRecorder
+      mr.start()
+      mediaRecorderRef.current = mr
       setIsRecording(true)
-
-      // Auto-stop after 60 seconds
-      setTimeout(() => {
-        if (mediaRecorder.state === 'recording') {
-          mediaRecorder.stop()
-          setIsRecording(false)
-        }
-      }, 60000)
-    } catch {
-      setError('无法访问麦克风，请检查权限')
-    }
+      setTimeout(() => { if (mr.state === 'recording') { mr.stop(); setIsRecording(false) } }, 60000)
+    } catch { setError('无法访问麦克风') }
   }, [])
 
   const stopRecording = useCallback(() => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+    if (mediaRecorderRef.current?.state === 'recording') {
       mediaRecorderRef.current.stop()
       setIsRecording(false)
     }
@@ -90,220 +66,192 @@ export default function CreatePage() {
     if (!canSubmit || !latitude || !longitude || !user) return
     setIsSubmitting(true)
     setError(null)
-
     try {
-      const formData = new FormData()
-      formData.append('message', message)
-      formData.append('latitude', String(latitude))
-      formData.append('longitude', String(longitude))
-      formData.append('visibility', visibility)
-      if (moodTags.length > 0) {
-        formData.append('mood_tag', moodTags[0])
-      }
-      photos.forEach((photo) => {
-        formData.append('photos', photo)
-      })
-      if (voiceBlob) {
-        formData.append('voice', voiceBlob, 'recording.webm')
-      }
-
-      await capsulesApi.create(formData)
+      const fd = new FormData()
+      fd.append('message', message)
+      fd.append('latitude', String(latitude))
+      fd.append('longitude', String(longitude))
+      fd.append('visibility', visibility)
+      if (moodTags.length > 0) fd.append('mood_tag', moodTags[0])
+      photos.forEach((p) => fd.append('photos', p))
+      if (voiceBlob) fd.append('voice', voiceBlob, 'recording.webm')
+      await capsulesApi.create(fd)
       navigate('/')
-    } catch (err: any) {
-      setError(err.message || '创建失败，请重试')
-    } finally {
-      setIsSubmitting(false)
-    }
+    } catch (err: any) { setError(err.message || '创建失败') }
+    finally { setIsSubmitting(false) }
   }
 
   return (
-    <div className="min-h-screen bg-bg px-4 py-6 pb-24">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <button
-          onClick={() => navigate(-1)}
-          className="text-slate-400 hover:text-white transition-colors"
-        >
-          ← 返回
+    <div className="min-h-screen bg-bg page-in">
+      {/* NAV */}
+      <header className="sticky top-0 z-30 hud px-4 py-3 flex items-center justify-between">
+        <button onClick={() => navigate(-1)} className="btn flex items-center gap-2 text-slate-400 hover:text-signal transition-colors">
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+          <span className="text-xs font-mono tracking-wider">RETURN</span>
         </button>
-        <h1 className="text-lg font-bold text-white">留下时空胶囊</h1>
-        <div className="w-12" />
-      </div>
+        <span className="label">DEPLOY CAPSULE</span>
+        <div className="w-16" />
+      </header>
 
-      <div className="max-w-lg mx-auto space-y-6">
-        {/* GPS Location */}
-        <div className="glass rounded-xl p-3">
-          <p className="text-xs text-slate-400 mb-1">📍 当前位置</p>
-          {latitude && longitude ? (
-            <p className="text-sm text-green-400">
-              {latitude.toFixed(6)}, {longitude.toFixed(6)}
-            </p>
-          ) : (
-            <p className="text-sm text-amber-400">
-              {geoError || '正在获取位置...'}
-            </p>
-          )}
-        </div>
+      <div className="max-w-lg mx-auto px-4 py-6 pb-28 space-y-6 stagger">
 
-        {/* Message input */}
-        <div>
-          <label className="block text-sm text-slate-300 mb-2">留言内容 *</label>
+        {/* GPS */}
+        <section>
+          <div className="label mb-2 flex items-center gap-2">
+            <span className="inline-block w-2 h-px bg-signal-dim" />
+            LOCATION_LOCK
+          </div>
+          <div className="panel p-3">
+            {latitude && longitude ? (
+              <div className="flex items-center justify-between">
+                <span className="data-value text-sm font-mono">{latitude.toFixed(6)}°N</span>
+                <span className="data-value text-sm font-mono">{longitude.toFixed(6)}°E</span>
+                <div className="w-2 h-2 bg-data-good" />
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-data-warn breathe" />
+                <span className="data text-data-warn">{geoError || 'Acquiring position...'}</span>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* MESSAGE */}
+        <section>
+          <div className="label mb-2 flex items-center gap-2">
+            <span className="inline-block w-2 h-px bg-signal-dim" />
+            MESSAGE_PAYLOAD
+          </div>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="写下你想留在这里的话..."
             maxLength={500}
             rows={5}
-            className="w-full px-4 py-3 rounded-xl bg-surface border border-slate-600 text-white placeholder-slate-500 focus:outline-none focus:border-primary transition-colors resize-none"
+            className="w-full px-4 py-3 bg-surface border border-border text-white placeholder-slate-600 focus:outline-none focus:border-signal transition-colors resize-none text-sm leading-relaxed"
           />
           <div className="flex justify-between mt-1">
-            <p className={`text-xs ${message.length < 10 ? 'text-amber-400' : 'text-slate-500'}`}>
-              {message.length < 10 ? `至少还需要${10 - message.length}个字` : '✓'}
-            </p>
-            <p className="text-xs text-slate-500">{message.length}/500</p>
+            <span className={`data ${message.length < 10 ? 'text-data-warn' : 'text-data-good'}`}>
+              {message.length < 10 ? `MIN ${10 - message.length} CHARS MORE` : 'VALID'}
+            </span>
+            <span className="data">{message.length}/500</span>
           </div>
-        </div>
+        </section>
 
-        {/* Photo upload */}
-        <div>
-          <label className="block text-sm text-slate-300 mb-2">
-            照片 (最多5张)
-          </label>
+        {/* PHOTOS */}
+        <section>
+          <div className="label mb-2 flex items-center gap-2">
+            <span className="inline-block w-2 h-px bg-signal-dim" />
+            PHOTO_ARCHIVE [max 5]
+          </div>
           <div className="flex flex-wrap gap-2">
-            {photos.map((photo, index) => (
-              <div key={index} className="relative w-20 h-20 rounded-lg overflow-hidden">
-                <img
-                  src={URL.createObjectURL(photo)}
-                  alt={`photo-${index}`}
-                  className="w-full h-full object-cover"
-                />
-                <button
-                  onClick={() => removePhoto(index)}
-                  className="absolute top-0.5 right-0.5 w-5 h-5 rounded-full bg-red-500/80 text-white text-xs flex items-center justify-center"
-                >
-                  ×
-                </button>
+            {photos.map((photo, i) => (
+              <div key={i} className="relative w-20 h-20 border border-border overflow-hidden">
+                <img src={URL.createObjectURL(photo)} alt="" className="w-full h-full object-cover" />
+                <button onClick={() => removePhoto(i)}
+                  className="absolute top-0.5 right-0.5 w-4 h-4 bg-data-bad/90 text-white text-[10px] flex items-center justify-center">×</button>
               </div>
             ))}
             {photos.length < 5 && (
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className="w-20 h-20 rounded-lg border-2 border-dashed border-slate-500 flex items-center justify-center text-slate-400 hover:border-primary hover:text-primary transition-colors"
-              >
-                +
+              <button onClick={() => fileInputRef.current?.click()}
+                className="w-20 h-20 border border-dashed border-surface-light flex items-center justify-center text-slate-500 hover:border-signal hover:text-signal transition-colors">
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                </svg>
               </button>
             )}
           </div>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png"
-            multiple
-            onChange={handlePhotoSelect}
-            className="hidden"
-          />
-        </div>
+          <input ref={fileInputRef} type="file" accept="image/jpeg,image/png" multiple onChange={handlePhotoSelect} className="hidden" />
+        </section>
 
-        {/* Voice recording */}
-        <div>
-          <label className="block text-sm text-slate-300 mb-2">语音留言 (可选, 最长60秒)</label>
+        {/* VOICE */}
+        <section>
+          <div className="label mb-2 flex items-center gap-2">
+            <span className="inline-block w-2 h-px bg-signal-dim" />
+            VOICE_RECORD [optional, max 60s]
+          </div>
           {voiceBlob ? (
-            <div className="flex items-center gap-3 glass rounded-xl p-3">
+            <div className="panel p-3 flex items-center gap-3">
               <audio src={URL.createObjectURL(voiceBlob)} controls className="flex-1 h-8" />
-              <button
-                onClick={() => setVoiceBlob(null)}
-                className="text-xs text-red-400 hover:text-red-300"
-              >
-                删除
-              </button>
+              <button onClick={() => setVoiceBlob(null)} className="data text-data-bad hover:text-red-300 transition-colors">CLEAR</button>
             </div>
           ) : (
-            <button
-              onClick={isRecording ? stopRecording : startRecording}
-              className={`
-                w-full py-3 rounded-xl text-sm font-medium transition-all
-                ${isRecording
-                  ? 'bg-red-500/20 border border-red-500 text-red-400'
-                  : 'bg-surface hover:bg-surface-light text-slate-300'
-                }
-              `}
-            >
-              {isRecording ? '⏹ 停止录制' : '🎙 开始录音'}
+            <button onClick={isRecording ? stopRecording : startRecording}
+              className={`btn w-full py-3 border text-xs font-mono tracking-wider transition-all ${
+                isRecording
+                  ? 'border-data-bad/30 bg-data-bad/5 text-data-bad'
+                  : 'border-border bg-surface/50 text-slate-400 hover:border-surface-light'
+              }`}>
+              {isRecording ? 'STOP RECORDING' : 'START RECORDING'}
             </button>
           )}
-        </div>
+        </section>
 
-        {/* Mood tags */}
-        <div>
-          <label className="block text-sm text-slate-300 mb-2">
-            心情标签 (可选, 最多3个)
-          </label>
-          <div className="flex flex-wrap gap-2">
+        {/* MOOD TAGS */}
+        <section>
+          <div className="label mb-2 flex items-center justify-between">
+            <span className="flex items-center gap-2">
+              <span className="inline-block w-2 h-px bg-signal-dim" />
+              EMOTION_TAGS
+            </span>
+            <span className="data">{moodTags.length}/3</span>
+          </div>
+          <div className="flex flex-wrap gap-1.5">
             {EMOTION_TAGS.map((tag) => {
-              const isSelected = moodTags.includes(tag)
+              const sel = moodTags.includes(tag)
               return (
-                <button
-                  key={tag}
-                  onClick={() => toggleMoodTag(tag)}
-                  className={`
-                    px-3 py-1.5 rounded-full text-xs transition-all
-                    ${isSelected
-                      ? 'bg-primary/20 border border-primary text-primary-light'
-                      : 'bg-surface border border-transparent text-slate-400 hover:text-white'
-                    }
-                  `}
-                >
+                <button key={tag} onClick={() => toggleMoodTag(tag)}
+                  className={`btn px-2.5 py-1 text-xs font-mono border transition-all ${
+                    sel ? 'border-primary/40 bg-primary/5 text-primary-light' : 'border-border text-slate-500 hover:text-slate-300'
+                  }`}>
                   {tag}
                 </button>
               )
             })}
           </div>
-        </div>
+        </section>
 
-        {/* Visibility */}
-        <div>
-          <label className="block text-sm text-slate-300 mb-2">可见范围</label>
-          <div className="flex gap-2">
-            {[
-              { value: 'public' as const, label: '🌍 所有人' },
-              { value: 'private' as const, label: '👤 仅指定人' },
-              { value: 'link_only' as const, label: '🔗 仅链接' },
-            ].map((opt) => (
-              <button
-                key={opt.value}
-                onClick={() => setVisibility(opt.value)}
-                className={`
-                  flex-1 py-2 rounded-lg text-xs transition-all
-                  ${visibility === opt.value
-                    ? 'bg-primary/20 border border-primary text-primary-light'
-                    : 'bg-surface text-slate-400'
-                  }
-                `}
-              >
+        {/* VISIBILITY */}
+        <section>
+          <div className="label mb-2 flex items-center gap-2">
+            <span className="inline-block w-2 h-px bg-signal-dim" />
+            ACCESS_LEVEL
+          </div>
+          <div className="flex gap-1.5">
+            {([
+              { value: 'public' as const, label: 'PUBLIC' },
+              { value: 'private' as const, label: 'PRIVATE' },
+              { value: 'link_only' as const, label: 'LINK ONLY' },
+            ]).map((opt) => (
+              <button key={opt.value} onClick={() => setVisibility(opt.value)}
+                className={`btn flex-1 py-2.5 text-[10px] font-mono tracking-wider border transition-all ${
+                  visibility === opt.value
+                    ? 'border-signal/40 bg-signal/5 text-signal'
+                    : 'border-border text-slate-500'
+                }`}>
                 {opt.label}
               </button>
             ))}
           </div>
-        </div>
+        </section>
 
-        {/* Error */}
-        {error && (
-          <p className="text-xs text-red-400 text-center">{error}</p>
-        )}
+        {/* ERROR */}
+        {error && <p className="data text-data-bad text-center">{error}</p>}
 
-        {/* Submit button */}
+        {/* DEPLOY */}
+        <div className="divider mb-4" />
         <button
           onClick={handleSubmit}
           disabled={!canSubmit || isSubmitting}
-          className={`
-            w-full py-4 rounded-xl text-sm font-bold transition-all
-            ${canSubmit && !isSubmitting
-              ? 'bg-accent hover:bg-accent-light text-black'
-              : 'bg-surface text-slate-500 cursor-not-allowed'
-            }
-          `}
-        >
-          {isSubmitting ? '封存中...' : '📮 封存时空胶囊'}
+          className={`btn w-full py-4 text-xs font-mono tracking-widest border transition-all ${
+            canSubmit && !isSubmitting
+              ? 'border-capsule/40 bg-capsule/5 text-capsule hover:bg-capsule/10'
+              : 'border-border text-slate-600 cursor-not-allowed'
+          }`}>
+          {isSubmitting ? 'DEPLOYING...' : 'DEPLOY CAPSULE'}
         </button>
       </div>
     </div>

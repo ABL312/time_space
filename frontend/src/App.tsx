@@ -20,8 +20,8 @@ function App() {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-bg">
         <div className="text-center">
-          <div className="envelope-loader mx-auto mb-4"></div>
-          <p className="text-slate-400 text-sm">正在连接时空...</p>
+          <div className="w-3 h-3 bg-signal breathe mx-auto mb-4" />
+          <p className="data text-signal">INITIALIZING</p>
         </div>
       </div>
     )
@@ -29,32 +29,30 @@ function App() {
 
   return (
     <BrowserRouter>
-      <div className="app-wrapper safe-area-top safe-area-bottom">
-        <Routes>
-          <Route
-            path="/onboarding"
-            element={user ? <Navigate to="/" replace /> : <OnboardingPage />}
-          />
-          <Route
-            path="/"
-            element={user ? <HomePage /> : <Navigate to="/onboarding" replace />}
-          />
-          <Route
-            path="/create"
-            element={user ? <CreatePage /> : <Navigate to="/onboarding" replace />}
-          />
-          <Route
-            path="/ar"
-            element={user ? <ARPage /> : <Navigate to="/onboarding" replace />}
-          />
-          <Route
-            path="/capsule/:id"
-            element={user ? <CapsuleDetailPage /> : <Navigate to="/onboarding" replace />}
-          />
-          {/* Catch-all redirect */}
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </div>
+      <Routes>
+        <Route
+          path="/onboarding"
+          element={user ? <Navigate to="/" replace /> : <OnboardingPage />}
+        />
+        <Route
+          path="/"
+          element={user ? <HomePage /> : <Navigate to="/onboarding" replace />}
+        />
+        <Route
+          path="/create"
+          element={user ? <CreatePage /> : <Navigate to="/onboarding" replace />}
+        />
+        <Route
+          path="/ar"
+          element={user ? <ARPage /> : <Navigate to="/onboarding" replace />}
+        />
+        <Route
+          path="/capsule/:id"
+          element={user ? <CapsuleDetailPage /> : <Navigate to="/onboarding" replace />}
+        />
+        {/* Catch-all redirect */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </BrowserRouter>
   )
 }
