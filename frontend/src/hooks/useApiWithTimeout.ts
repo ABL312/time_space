@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { capsulesApi } from '../lib/api'
-import type { Capsule, NearbyResponse } from '../types'
+import type { NearbyResponse } from '../types'
 
 interface UseApiWithTimeoutOptions {
   timeout?: number

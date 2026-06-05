@@ -138,6 +138,33 @@ export default function ARScene({
       }
     })
 
+    // Raycasting for click detection
+    const raycaster = new THREE.Raycaster()
+    const mouse = new THREE.Vector2()
+
+    const handleClick = (event: MouseEvent) => {
+      // Calculate mouse position in normalized device coordinates
+      const rect = renderer.domElement.getBoundingClientRect()
+      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
+      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
+
+      // Update the picking ray with the camera and mouse position
+      raycaster.setFromCamera(mouse, camera)
+
+      // Calculate objects intersecting the picking ray
+      const intersects = raycaster.intersectObjects(
+        Array.from(capsuleMeshesRef.current.values()).filter(mesh => mesh.visible),
+        true
+      )
+
+      if (intersects.length > 0) {
+        const clickedGroup = intersects[0].object.parent as THREE.Group
+        if (clickedGroup && clickedGroup.userData.capsuleId) {
+          onCapsuleClick(clickedGroup.userData.capsuleId)
+        }
+      }
+    }
+
     // Animation loop
     const animate = () => {
       animFrameRef.current = requestAnimationFrame(animate)
@@ -151,38 +178,11 @@ export default function ARScene({
         }
       })
 
-      // Raycasting for click detection
-      const raycaster = new THREE.Raycaster()
-      const mouse = new THREE.Vector2()
-
-      const handleClick = (event: MouseEvent) => {
-        // Calculate mouse position in normalized device coordinates
-        const rect = renderer.domElement.getBoundingClientRect()
-        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
-        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
-
-        // Update the picking ray with the camera and mouse position
-        raycaster.setFromCamera(mouse, camera)
-
-        // Calculate objects intersecting the picking ray
-        const intersects = raycaster.intersectObjects(
-          Array.from(capsuleMeshesRef.current.values()).filter(mesh => mesh.visible),
-          true
-        )
-
-        if (intersects.length > 0) {
-          const clickedGroup = intersects[0].object.parent as THREE.Group
-          if (clickedGroup && clickedGroup.userData.capsuleId) {
-            onCapsuleClick(clickedGroup.userData.capsuleId)
-          }
-        }
-      }
-
-      // Attach event listener
-      renderer.domElement.addEventListener('click', handleClick)
-
       renderer.render(scene, camera)
     }
+
+    // Attach event listener
+    renderer.domElement.addEventListener('click', handleClick)
     animate()
 
     return () => {

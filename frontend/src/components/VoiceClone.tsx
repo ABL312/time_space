@@ -16,7 +16,7 @@ interface VoiceCloneProps {
 type Status = 'idle' | 'recording' | 'uploading' | 'ready' | 'playing' | 'error'
 
 export default function VoiceClone({
-  capsuleId,
+  capsuleId: _capsuleId,
   onComplete,
   placeholder = '输入你想让这个声音说的话...',
   maxRecordSeconds = 10,
