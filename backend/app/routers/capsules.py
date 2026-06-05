@@ -1,6 +1,7 @@
 """
 Capsule CRUD and nearby query routes.
 """
+import asyncio
 import uuid
 import json
 from typing import Optional
@@ -11,8 +12,36 @@ from ..models import CapsuleResponse, NearbyResponse
 from ..services.geohash_service import encode, find_nearby_capsules, haversine_distance
 from ..services.recommend_service import rank_capsules
 from ..services.storage_service import storage_service
+from ..services.emotion_service import emotion_service
 
 router = APIRouter(prefix="/api/capsules", tags=["capsules"])
+
+
+async def _analyze_and_update_emotion(capsule_id: str, message: str):
+    """Background task: analyze emotion and update capsule in DB."""
+    try:
+        result = await emotion_service.analyze(message)
+        db = await get_db()
+        try:
+            await db.execute(
+                """
+                UPDATE capsules
+                SET emotion_tags = ?, sentiment = ?, emotion_intensity = ?, emotion_summary = ?
+                WHERE id = ?
+                """,
+                (
+                    json.dumps(result["emotions"], ensure_ascii=False),
+                    result["sentiment"],
+                    result["intensity"],
+                    result["summary"],
+                    capsule_id,
+                ),
+            )
+            await db.commit()
+        finally:
+            await db.close()
+    except Exception as e:
+        print(f"Background emotion analysis failed for {capsule_id}: {e}")
 
 
 def _parse_capsule_row(row: dict) -> dict:
@@ -102,6 +131,9 @@ async def create_capsule(
                 pass
 
         await db.commit()
+
+        # Kick off async emotion analysis (non-blocking)
+        asyncio.create_task(_analyze_and_update_emotion(capsule_id, message))
 
         # Fetch and return the created capsule
         cursor = await db.execute(

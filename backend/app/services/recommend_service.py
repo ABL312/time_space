@@ -67,6 +67,9 @@ def calculate_match_score(
     popularity_score = min(open_count / 50, 1.0)
     scores["popularity"] = popularity_score * 0.1
 
+    if open_count >= 10:
+        reasons.append(f"已被打开 {open_count} 次")
+
     total_score = sum(scores.values())
     return round(total_score, 3), reasons
 

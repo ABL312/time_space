@@ -14,6 +14,7 @@ from ..models import (
     LocationContextResponse,
     VoiceCloneResponse,
 )
+from ..services.emotion_service import emotion_service
 
 router = APIRouter(prefix="/api/ai", tags=["ai"])
 
@@ -21,93 +22,24 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 
-# 16 emotion tags
-EMOTION_TAGS = [
-    "怀旧", "温暖", "感恩", "浪漫", "思念", "快乐",
-    "遗憾", "鼓励", "幽默", "神秘", "孤独", "希望",
-    "青春", "友情", "亲情", "爱情",
-]
-
-# Keyword fallback mapping
-KEYWORD_MAP = {
-    "怀旧": ["回忆", "从前", "曾经", "当年", "那时候", "旧时光", "记忆"],
-    "温暖": ["温暖", "温馨", "暖", "幸福", "美好"],
-    "感恩": ["感谢", "感恩", "谢谢", "幸运"],
-    "浪漫": ["爱", "浪漫", "约会", "心动", "喜欢"],
-    "思念": ["想念", "思念", "牵挂", "远方"],
-    "快乐": ["开心", "快乐", "高兴", "笑", "哈哈", "欢乐"],
-    "遗憾": ["遗憾", "可惜", "来不及", "错过"],
-    "鼓励": ["加油", "努力", "坚持", "勇敢", "相信"],
-    "幽默": ["搞笑", "有趣", "哈哈", "笑死", "段子"],
-    "神秘": ["秘密", "神秘", "未知", "探索"],
-    "孤独": ["孤独", "一个人", "寂寞", "独自"],
-    "希望": ["希望", "期待", "未来", "梦想", "明天"],
-    "青春": ["青春", "毕业", "校园", "同学", "大学"],
-    "友情": ["朋友", "友谊", "兄弟", "闺蜜"],
-    "亲情": ["家人", "父母", "爷爷奶奶", "家", "亲人"],
-    "爱情": ["爱情", "恋人", "男朋友", "女朋友", "老公", "老婆"],
-}
-
-
-def _keyword_fallback(message: str) -> EmotionAnalysisResponse:
-    """Fallback emotion analysis using keyword matching."""
-    found_emotions = []
-    for emotion, keywords in KEYWORD_MAP.items():
-        for kw in keywords:
-            if kw in message:
-                found_emotions.append(emotion)
-                break
-        if len(found_emotions) >= 3:
-            break
-
-    if not found_emotions:
-        found_emotions = ["温暖", "希望"]
-
-    return EmotionAnalysisResponse(
-        emotions=found_emotions[:4],
-        sentiment="positive",
-        intensity=0.6,
-        summary=f"包含{', '.join(found_emotions[:2])}情感的留言",
-    )
-
 
 @router.post("/analyze-emotion", response_model=EmotionAnalysisResponse)
 async def analyze_emotion(data: EmotionAnalysisRequest):
     """
     Analyze emotion in a capsule message.
     Uses GPT-4o-mini if API key available, falls back to keyword matching.
+    Delegates to EmotionService for all logic.
     """
-    if not OPENAI_API_KEY:
-        return _keyword_fallback(data.message)
+    if not data.message or not data.message.strip():
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-    try:
-        from openai import AsyncOpenAI
-        client = AsyncOpenAI(api_key=OPENAI_API_KEY)
-
-        response = await client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {
-                    "role": "system",
-                    "content": f"""你是一个情感分析助手。分析时空信箱留言的情感特征。
-请返回JSON格式，emotions从以下选择2-4个：{json.dumps(EMOTION_TAGS, ensure_ascii=False)}""",
-                },
-                {"role": "user", "content": f"留言内容：{data.message}"},
-            ],
-            response_format={"type": "json_object"},
-            timeout=3.0,
-        )
-
-        result = json.loads(response.choices[0].message.content)
-        return EmotionAnalysisResponse(
-            emotions=result.get("emotions", ["温暖"]),
-            sentiment=result.get("sentiment", "positive"),
-            intensity=float(result.get("intensity", 0.6)),
-            summary=result.get("summary", ""),
-        )
-    except Exception as e:
-        print(f"⚠️ OpenAI API error: {e}, using keyword fallback")
-        return _keyword_fallback(data.message)
+    result = await emotion_service.analyze(data.message)
+    return EmotionAnalysisResponse(
+        emotions=result["emotions"],
+        sentiment=result["sentiment"],
+        intensity=result["intensity"],
+        summary=result["summary"],
+    )
 
 
 @router.get("/location-context", response_model=LocationContextResponse)
@@ -192,7 +124,7 @@ async def recognize_scene(
                         },
                         {
                             "type": "text",
-                            "text": f'返回JSON：{{"scene_type": "...", "description": "...", "atmosphere": "...", "mood_match": [...]}}。mood_match从以下选择：{json.dumps(EMOTION_TAGS, ensure_ascii=False)}',
+                            "text": f'返回JSON：{{"scene_type": "...", "description": "...", "atmosphere": "...", "mood_match": [...]}}。mood_match从以下选择：{json.dumps(emotion_service.EMOTION_TAGS, ensure_ascii=False)}',
                         },
                     ],
                 },
