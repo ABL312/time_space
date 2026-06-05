@@ -50,3 +50,11 @@ frontend/public/sw.js.map
 
 # Docs / handover files
 docs/
+
+# Local HTTPS certificates (mkcert)
+*.pem
+localhost+2-key.pem
+localhost+2.pem
+
+# Nested git repos
+time_space/

@@ -12,7 +12,7 @@ import ProximityAlert from '../components/ProximityAlert'
 
 export default function HomePage() {
   const navigate = useNavigate()
-  const { latitude, longitude, error: geoError } = useGeolocation()
+  const { latitude, longitude, error: geoError, locationSource } = useGeolocation()
   const { virtualLocation, setVirtual } = useVirtualLocation()
   const { user, clearUser } = useUserStore()
   const { fetchNearby, nearby, isLoadingNearby } = useCapsuleStore()
@@ -69,6 +69,11 @@ export default function HomePage() {
                 VIRTUAL LOCATION
               </span>
             )}
+            {locationSource === 'ip' && (
+              <span className="data text-data-warn border border-data-warn/30 px-1.5 py-0.5">
+                IP定位 ≈5km
+              </span>
+            )}
             {cap.useExpandedGPS && (
               <span className="data text-data-warn border border-data-warn/30 px-1.5 py-0.5">
                 GPS DEGRADED
@@ -85,9 +90,23 @@ export default function HomePage() {
           </div>
         )}
         {geoError && (
-          <div className="hud px-3 py-2 border-data-bad/20 flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-data-bad" />
-            <span className="data text-data-bad">{geoError}</span>
+          <div className={`hud px-3 py-2 flex items-center gap-2 ${geoError.includes('正在') ? 'border-data-warn/20' : 'border-data-bad/20'}`}>
+            <div className={`w-1.5 h-1.5 ${geoError.includes('正在') ? 'bg-data-warn breathe' : 'bg-data-bad'}`} />
+            <span className={`data ${geoError.includes('正在') ? 'text-data-warn' : 'text-data-bad'}`}>{geoError}</span>
+            {!geoError.includes('正在') && (
+              <button
+                onClick={() => {
+                  const lat = prompt('输入纬度 (例如: 31.0282)', '31.0282')
+                  const lng = prompt('输入经度 (例如: 121.4346)', '121.4346')
+                  if (lat && lng) {
+                    setVirtual(parseFloat(lat), parseFloat(lng))
+                  }
+                }}
+                className="btn ml-1 text-signal border border-signal/20 px-2 py-0.5 text-xs"
+              >
+                手动设置
+              </button>
+            )}
           </div>
         )}
       </div>

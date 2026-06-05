@@ -8,6 +8,10 @@ interface GeolocationState {
   speed: number | null
   error: string | null
   isWatching: boolean
+  /** Where the location came from: browser GPS, IP-based, or manual */
+  locationSource: 'native' | 'ip' | 'manual' | null
+  /** True if we're using a less-accurate fallback (IP geolocation) */
+  isFallback: boolean
 }
 
 interface UseGeolocationOptions {
@@ -15,6 +19,54 @@ interface UseGeolocationOptions {
   timeout?: number
   maximumAge?: number
   watch?: boolean
+}
+
+/**
+ * Try to get approximate location from a free IP geolocation API.
+ * Works over HTTP on most browsers — no permission prompt needed.
+ */
+async function getIPLocation(): Promise<{ lat: number; lng: number; accuracy: number } | null> {
+  const endpoints = [
+    {
+      url: 'https://ipapi.co/json/',
+      parse: (data: Record<string, unknown>) => ({
+        lat: data.latitude as number,
+        lng: data.longitude as number,
+      }),
+    },
+    {
+      url: 'http://ip-api.com/json/?lang=zh-CN',
+      parse: (data: Record<string, unknown>) => ({
+        lat: data.lat as number,
+        lng: data.lon as number,
+      }),
+    },
+    {
+      url: 'https://ipinfo.io/json',
+      parse: (data: Record<string, unknown>) => {
+        const loc = (data.loc as string).split(',')
+        return { lat: parseFloat(loc[0]), lng: parseFloat(loc[1]) }
+      },
+    },
+  ]
+
+  for (const endpoint of endpoints) {
+    try {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 4000)
+      const res = await fetch(endpoint.url, { signal: controller.signal })
+      clearTimeout(timer)
+      if (!res.ok) continue
+      const data = await res.json()
+      const { lat, lng } = endpoint.parse(data)
+      if (typeof lat === 'number' && typeof lng === 'number' && !isNaN(lat) && !isNaN(lng)) {
+        return { lat, lng, accuracy: 5000 }
+      }
+    } catch {
+      // try next endpoint
+    }
+  }
+  return null
 }
 
 export function useGeolocation(options: UseGeolocationOptions = {}) {
@@ -33,9 +85,40 @@ export function useGeolocation(options: UseGeolocationOptions = {}) {
     speed: null,
     error: null,
     isWatching: false,
+    locationSource: null,
+    isFallback: false,
   })
 
   const watchIdRef = useRef<number | null>(null)
+  const fallbackTriggeredRef = useRef(false)
+
+  const triggerIPFallback = useCallback(async () => {
+    if (fallbackTriggeredRef.current) return
+    fallbackTriggeredRef.current = true
+    setState((prev) => ({ ...prev, error: '正在使用IP定位...' }))
+    const ipLoc = await getIPLocation()
+    if (ipLoc) {
+      setState((prev) => ({
+        ...prev,
+        latitude: ipLoc.lat,
+        longitude: ipLoc.lng,
+        accuracy: ipLoc.accuracy,
+        heading: null,
+        speed: null,
+        error: null,
+        isWatching: true,
+        locationSource: 'ip',
+        isFallback: true,
+      }))
+    } else {
+      setState((prev) => ({
+        ...prev,
+        error: 'IP定位失败，请手动设置坐标',
+        isWatching: false,
+        locationSource: null,
+      }))
+    }
+  }, [])
 
   const onSuccess = useCallback((position: GeolocationPosition) => {
     setState({
@@ -46,37 +129,46 @@ export function useGeolocation(options: UseGeolocationOptions = {}) {
       speed: position.coords.speed,
       error: null,
       isWatching: true,
+      locationSource: 'native',
+      isFallback: false,
     })
   }, [])
 
-  const onError = useCallback((error: GeolocationPositionError) => {
-    let message: string
-    switch (error.code) {
-      case error.PERMISSION_DENIED:
-        message = '位置权限被拒绝，请在设置中开启定位权限'
-        break
-      case error.POSITION_UNAVAILABLE:
-        message = '位置信息不可用'
-        break
-      case error.TIMEOUT:
-        message = '获取位置超时'
-        break
-      default:
-        message = '未知定位错误'
-    }
-    setState((prev) => ({
-      ...prev,
-      error: message,
-      isWatching: false,
-    }))
-  }, [])
+  const onError = useCallback(
+    (error: GeolocationPositionError) => {
+      let message: string
+      switch (error.code) {
+        case error.PERMISSION_DENIED:
+          message = '位置权限被拒绝，正在尝试IP定位...'
+          break
+        case error.POSITION_UNAVAILABLE:
+          message = '位置信息不可用，正在尝试IP定位...'
+          break
+        case error.TIMEOUT:
+          message = '获取位置超时，正在尝试IP定位...'
+          break
+        default:
+          message = '未知定位错误，正在尝试IP定位...'
+      }
+      setState((prev) => ({ ...prev, error: message, isWatching: false }))
+      triggerIPFallback()
+    },
+    [triggerIPFallback]
+  )
 
   useEffect(() => {
+    // If geolocation API is not available, go straight to IP fallback
     if (!navigator.geolocation) {
-      setState((prev) => ({
-        ...prev,
-        error: '浏览器不支持地理定位',
-      }))
+      setState((prev) => ({ ...prev, error: '浏览器不支持GPS定位，尝试IP定位...' }))
+      triggerIPFallback()
+      return
+    }
+
+    // If page is not a secure context (self-signed cert), the geolocation API
+    // may exist but silently fail. Skip directly to IP fallback.
+    if (typeof window.isSecureContext === 'boolean' && !window.isSecureContext) {
+      setState((prev) => ({ ...prev, error: '非安全上下文，GPS不可用，尝试IP定位...' }))
+      triggerIPFallback()
       return
     }
 
@@ -93,11 +185,7 @@ export function useGeolocation(options: UseGeolocationOptions = {}) {
         geoOptions
       )
     } else {
-      navigator.geolocation.getCurrentPosition(
-        onSuccess,
-        onError,
-        geoOptions
-      )
+      navigator.geolocation.getCurrentPosition(onSuccess, onError, geoOptions)
     }
 
     return () => {
@@ -106,7 +194,7 @@ export function useGeolocation(options: UseGeolocationOptions = {}) {
         watchIdRef.current = null
       }
     }
-  }, [enableHighAccuracy, timeout, maximumAge, watch, onSuccess, onError])
+  }, [enableHighAccuracy, timeout, maximumAge, watch, onSuccess, onError, triggerIPFallback])
 
   return state
 }

@@ -2,7 +2,10 @@
 Geohash-based nearby capsule query service.
 Uses 6-character geohash (~1.2km precision) + 8 neighbors for area search.
 """
-import geohash
+try:
+    import geohash
+except ImportError:
+    import pygeohash as geohash
 import math
 from typing import Optional
 
