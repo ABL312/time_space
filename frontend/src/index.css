@@ -176,3 +176,13 @@ body {
 .animate-slide-up {
   animation: slide-up-panel 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* Recommendation panel styles */
+.recommendation-card {
+  transition: all 0.2s ease;
+}
+
+.recommendation-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}

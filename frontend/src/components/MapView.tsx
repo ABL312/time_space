@@ -78,13 +78,15 @@ export default function MapView({
     // Add capsule markers
     capsules.forEach((capsule) => {
       const isRecommended = (capsule.match_score ?? 0) > 0.5
-
+      
       const el = document.createElement('div')
       
       // Apply different styling based on recommendation status
       if (isRecommended) {
-        el.className = 'capsule-marker-recommended w-3.5 h-3.5 rounded-full bg-accent cursor-pointer border-2 border-yellow-300 shadow-lg'
+        // Larger marker with golden glow for recommended capsules
+        el.className = 'capsule-marker-recommended w-3.5 h-3.5 rounded-full bg-accent cursor-pointer border-2 border-yellow-300 shadow-lg shadow-yellow-500/50'
       } else {
+        // Smaller marker for other capsules
         el.className = 'capsule-marker w-2 h-2 rounded-full bg-white cursor-pointer border border-blue-300'
       }
 
@@ -113,9 +115,10 @@ export default function MapView({
           closeButton: false,
           className: 'bg-surface text-white text-xs px-2 py-1 rounded'
         }).setText('✨ 推荐')
-
+        
         marker.setPopup(popup)
         
+        // Show popup on hover
         el.addEventListener('mouseenter', () => {
           marker.togglePopup()
         })
