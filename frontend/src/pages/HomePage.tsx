@@ -5,6 +5,7 @@ import { useVirtualLocation } from '../hooks/useVirtualLocation'
 import { useCapsuleStore } from '../stores/capsuleStore'
 import { useUserStore } from '../stores/userStore'
 import { useCapabilityCheck } from '../hooks/useCapabilityCheck'
+import { searchApi } from '../lib/api'
 import MapView from '../components/MapView'
 import RecommendPanel from '../components/RecommendPanel'
 import { useProximityAlert } from '../hooks/useProximityAlert'
@@ -12,6 +13,7 @@ import ProximityAlert from '../components/ProximityAlert'
 import { useAchievements } from '../hooks/useAchievements'
 import AchievementPanel from '../components/AchievementPanel'
 import DanmakuLayer from '../components/DanmakuLayer'
+import type { Capsule } from '../types'
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -22,6 +24,13 @@ export default function HomePage() {
   const cap = useCapabilityCheck()
   const { achievements } = useAchievements()
   const [isAchievementPanelOpen, setIsAchievementPanelOpen] = useState(false)
+  
+  // Search states
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<Capsule[]>([])
+  const [isSearching, setIsSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const [selectedTag, setSelectedTag] = useState<string | null>(null)
   
   // 优先使用虚拟位置，否则使用真实位置，最后使用默认演示位置
   const effectiveLatitude = virtualLocation?.lat ?? latitude ?? 31.0282
@@ -108,6 +117,16 @@ export default function HomePage() {
             <span className="data text-signal">SCANNING</span>
           </div>
         )}
+        <button
+          onClick={() => navigate('/favorites')}
+          className="btn hud px-2.5 py-1.5 flex items-center gap-1.5 text-slate-400 hover:text-red-400 transition-colors"
+          title="我的收藏"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+          </svg>
+          <span className="data">收藏</span>
+        </button>
         <button
           onClick={() => setIsAchievementPanelOpen(true)}
           className="btn hud px-2.5 py-1.5 flex items-center gap-1.5 text-slate-400 hover:text-yellow-300 transition-colors"

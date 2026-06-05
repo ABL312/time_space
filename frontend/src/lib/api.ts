@@ -184,6 +184,47 @@ export const aiApi = {
 }
 
 // ==========================================
+// Responses API
+// ==========================================
+export const responsesApi = {
+  list: (capsuleId: string) => fetch(`/api/capsules/${capsuleId}/responses`).then(r => r.json()),
+  create: (capsuleId: string, content: string, userId?: string, nickname?: string) =>
+    fetch(`/api/capsules/${capsuleId}/responses`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ content, user_id: userId, nickname: nickname || '匿名' })
+    }).then(r => r.json())
+}
+
+// ==========================================
+// Favorites API
+// ==========================================
+export const favoritesApi = {
+  add: (capsuleId: string, userId: string) =>
+    fetch(`/api/favorites/${capsuleId}?user_id=${userId}`, { method: 'POST' }),
+  remove: (capsuleId: string, userId: string) =>
+    fetch(`/api/favorites/${capsuleId}?user_id=${userId}`, { method: 'DELETE' }),
+  list: (userId: string) => fetch(`/api/favorites?user_id=${userId}`).then(r => r.json()),
+  status: (capsuleId: string, userId: string) =>
+    fetch(`/api/capsules/${capsuleId}/favorite-status?user_id=${userId}`).then(r => r.json())
+}
+
+// ==========================================
+// Search API
+// ==========================================
+export const searchApi = {
+  search: (params: { q?: string; tag?: string; lat?: number; lng?: number; radius?: number }) => {
+    const query = new URLSearchParams()
+    if (params.q) query.set('q', params.q)
+    if (params.tag) query.set('tag', params.tag)
+    if (params.lat) query.set('lat', String(params.lat))
+    if (params.lng) query.set('lng', String(params.lng))
+    if (params.radius) query.set('radius', String(params.radius))
+    return fetch(`/api/capsules/search?${query}`).then(r => r.json())
+  }
+}
+
+// ==========================================
 // Health check
 // ==========================================
 export function healthCheck(): Promise<{ status: string }> {

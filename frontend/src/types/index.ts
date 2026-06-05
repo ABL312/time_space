@@ -100,7 +100,26 @@ export interface VoiceCloneResult {
   duration_seconds: number
 }
 
-/** Interest tag options (8 presets) */
+/** Response to a capsule */
+export interface CapsuleResponse {
+  id: string
+  capsule_id: string
+  content: string
+  user_id?: string
+  nickname: string
+  created_at: string
+}
+
+/** Favorite capsule */
+export interface FavoriteCapsule {
+  id: string
+  user_id: string
+  capsule_id: string
+  created_at: string
+  capsule: Capsule
+}
+
+// ==========================================
 export const INTEREST_TAGS = [
   { key: 'campus', label: '校园回忆', emoji: '🏫' },
   { key: 'love', label: '爱情故事', emoji: '💕' },

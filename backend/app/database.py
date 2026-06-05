@@ -49,6 +49,9 @@ CREATE TABLE IF NOT EXISTS capsules (
     -- Time lock
     unlock_at TIMESTAMP,  -- NULL means immediately available
     
+    -- Share token for link sharing
+    share_token TEXT UNIQUE,
+    
     -- Metadata
     mood_tag TEXT,
     open_count INTEGER DEFAULT 0,
@@ -99,6 +102,17 @@ CREATE TABLE IF NOT EXISTS favorites (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, capsule_id),
     FOREIGN KEY (capsule_id) REFERENCES capsules(id)
+);
+
+CREATE TABLE IF NOT EXISTS collections (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    description TEXT,
+    cover_image TEXT,
+    creator_id TEXT,
+    capsule_ids TEXT,  -- JSON array of capsule IDs, ordered
+    view_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 """
 

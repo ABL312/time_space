@@ -10,6 +10,7 @@ import CreatePage from './pages/CreatePage'
 import ARPage from './pages/ARPage'
 import CapsuleDetailPage from './pages/CapsuleDetailPage'
 import MyCapsulesPage from './pages/MyCapsulesPage'
+import FavoritesPage from './pages/FavoritesPage'
 
 function App() {
   const { user, loadUser, isLoading } = useUserStore()
@@ -61,6 +62,10 @@ function App() {
         <Route
           path="/mine"
           element={user ? <MyCapsulesPage /> : <Navigate to="/onboarding" replace />}
+        />
+        <Route
+          path="/favorites"
+          element={user ? <FavoritesPage /> : <Navigate to="/onboarding" replace />}
         />
         {/* Catch-all redirect */}
         <Route path="*" element={<Navigate to="/" replace />} />

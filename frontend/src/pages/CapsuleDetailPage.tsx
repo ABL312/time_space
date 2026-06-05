@@ -2,15 +2,28 @@ import { useEffect, useState, useRef, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useCapsuleStore } from '../stores/capsuleStore'
 import { useOfflineCache } from '../hooks/useCapabilityCheck'
-import type { Capsule } from '../types'
+import { responsesApi, favoritesApi } from '../lib/api'
+import type { Capsule, CapsuleResponse } from '../types'
+import { useUserStore } from '../stores/userStore'
 
 export default function CapsuleDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { selectedCapsule, fetchCapsule, isLoadingDetail } = useCapsuleStore()
   const { cacheResponse, getCached } = useOfflineCache()
+  const { user } = useUserStore()
   const [decoded, setDecoded] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
+  
+  // Response states
+  const [responses, setResponses] = useState<CapsuleResponse[]>([])
+  const [newResponse, setNewResponse] = useState('')
+  const [isSubmittingResponse, setIsSubmittingResponse] = useState(false)
+  const [responseError, setResponseError] = useState<string | null>(null)
+  
+  // Favorite states
+  const [isFavorite, setIsFavorite] = useState(false)
+  const [isTogglingFavorite, setIsTogglingFavorite] = useState(false)
 
   useEffect(() => {
     if (!id) return
@@ -27,6 +40,24 @@ export default function CapsuleDetailPage() {
       .catch((err) => setFetchError(err?.message || '加载失败'))
   }, [id, fetchCapsule, cacheResponse, getCached])
 
+  // Fetch responses when capsule is loaded
+  useEffect(() => {
+    if (id && selectedCapsule) {
+      responsesApi.list(id)
+        .then(setResponses)
+        .catch((err) => console.error('Failed to fetch responses:', err))
+    }
+  }, [id, selectedCapsule])
+
+  // Check favorite status when capsule and user are loaded
+  useEffect(() => {
+    if (id && user && selectedCapsule) {
+      favoritesApi.status(id, user.id)
+        .then((res) => setIsFavorite(res.is_favorite))
+        .catch((err) => console.error('Failed to fetch favorite status:', err))
+    }
+  }, [id, user, selectedCapsule])
+
   useEffect(() => {
     if (selectedCapsule) {
       const timer = setTimeout(() => setDecoded(true), 150)
@@ -37,6 +68,43 @@ export default function CapsuleDetailPage() {
   if (isLoadingDetail && !selectedCapsule) return <LoadingState />
   if (fetchError && !selectedCapsule) return <ErrorState error={fetchError} onRetry={() => { setFetchError(null); if (id) fetchCapsule(id) }} onBack={() => navigate(-1)} />
   if (!selectedCapsule) return <NotFoundState onBack={() => navigate('/')} />
+
+  const handleResponseSubmit = async () => {
+    if (!id || !newResponse.trim()) return
+    
+    setIsSubmittingResponse(true)
+    setResponseError(null)
+    
+    try {
+      const response = await responsesApi.create(id, newResponse.trim())
+      setResponses(prev => [...prev, response])
+      setNewResponse('')
+    } catch (err: any) {
+      setResponseError(err.message || '发送失败')
+    } finally {
+      setIsSubmittingResponse(false)
+    }
+  }
+
+  const toggleFavorite = async () => {
+    if (!id || !user) return
+    
+    setIsTogglingFavorite(true)
+    
+    try {
+      if (isFavorite) {
+        await favoritesApi.remove(id, user.id)
+        setIsFavorite(false)
+      } else {
+        await favoritesApi.add(id, user.id)
+        setIsFavorite(true)
+      }
+    } catch (err) {
+      console.error('Failed to toggle favorite:', err)
+    } finally {
+      setIsTogglingFavorite(false)
+    }
+  }
 
   const c: Capsule = selectedCapsule
   const photos = c.media?.filter((m) => m.type === 'photo') ?? []
@@ -52,7 +120,23 @@ export default function CapsuleDetailPage() {
           <span className="text-xs font-mono tracking-wider">RETURN</span>
         </button>
         <span className="label">CAPSULE // {c.id?.toString().padStart(4, '0')}</span>
-        <div className="w-20" />
+        <button 
+          onClick={toggleFavorite}
+          disabled={isTogglingFavorite}
+          className="btn flex items-center justify-center w-8 h-8"
+        >
+          {isTogglingFavorite ? (
+            <div className="w-4 h-4 border border-signal border-t-transparent animate-spin" />
+          ) : isFavorite ? (
+            <svg className="w-4 h-4 text-red-500 fill-current" viewBox="0 0 24 24">
+              <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+            </svg>
+          ) : (
+            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+            </svg>
+          )}
+        </button>
       </header>
 
       <div className="max-w-lg mx-auto px-4 py-6 pb-28 stagger">
@@ -204,8 +288,61 @@ export default function CapsuleDetailPage() {
           </div>
         </section>
 
+        {/* ── RESPONSES ── */}
+        <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.6s' }}>
+          <div className="label mb-2 flex items-center gap-2">
+            <span className="inline-block w-2 h-px bg-signal-dim" />
+            RESPONSES [{responses.length}]
+          </div>
+          <div className="space-y-4">
+            {/* Response list */}
+            {responses.length > 0 ? (
+              responses.map((response) => (
+                <div key={response.id} className="panel p-4">
+                  <div className="flex items-start justify-between mb-2">
+                    <span className="font-medium text-white">{response.nickname}</span>
+                    <span className="data text-xs">{formatDate(response.created_at)}</span>
+                  </div>
+                  <p className="text-sm text-slate-300 whitespace-pre-wrap">{response.content}</p>
+                </div>
+              ))
+            ) : (
+              <div className="panel p-4 text-center text-slate-500">
+                <p>还没有人回应，来做第一个留言的人吧！</p>
+              </div>
+            )}
+
+            {/* Response input */}
+            <div className="panel p-4">
+              <textarea
+                value={newResponse}
+                onChange={(e) => setNewResponse(e.target.value)}
+                placeholder="写下你的回应..."
+                maxLength={500}
+                rows={3}
+                className="w-full px-3 py-2 bg-surface border border-border text-white placeholder-slate-600 focus:outline-none focus:border-signal transition-colors resize-none text-sm"
+              />
+              <div className="flex justify-between items-center mt-2">
+                <span className="data">{newResponse.length}/500</span>
+                <button
+                  onClick={handleResponseSubmit}
+                  disabled={!newResponse.trim() || isSubmittingResponse}
+                  className={`btn px-4 py-1.5 text-xs font-mono tracking-wider border transition-all ${
+                    newResponse.trim() && !isSubmittingResponse
+                      ? 'border-primary/40 bg-primary/5 text-primary-light hover:bg-primary/10'
+                      : 'border-border text-slate-600 cursor-not-allowed'
+                  }`}
+                >
+                  {isSubmittingResponse ? 'SENDING...' : 'SEND'}
+                </button>
+              </div>
+              {responseError && <p className="data text-data-bad mt-2 text-center">{responseError}</p>}
+            </div>
+          </div>
+        </section>
+
         {/* ── ACTION ── */}
-        <div className={`${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.6s' }}>
+        <div className={`${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.7s' }}>
           <div className="divider mb-5" />
           <button
             onClick={() => navigate(`/create?reply_to=${c.id}`)}
