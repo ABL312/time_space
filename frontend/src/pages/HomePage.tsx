@@ -18,9 +18,9 @@ export default function HomePage() {
   const { fetchNearby, nearby, isLoadingNearby } = useCapsuleStore()
   const cap = useCapabilityCheck()
   
-  // 优先使用虚拟位置，否则使用真实位置
-  const effectiveLatitude = virtualLocation?.lat ?? latitude
-  const effectiveLongitude = virtualLocation?.lng ?? longitude
+  // 优先使用虚拟位置，否则使用真实位置，最后使用默认演示位置
+  const effectiveLatitude = virtualLocation?.lat ?? latitude ?? 31.0282
+  const effectiveLongitude = virtualLocation?.lng ?? longitude ?? 121.4346
   
   // Proximity alert hook
   const { triggeredCapsule, distance, dismiss } = useProximityAlert({
@@ -50,8 +50,8 @@ export default function HomePage() {
     <div className="relative h-screen w-screen overflow-hidden bg-void">
       {/* Map */}
       <MapView
-        latitude={effectiveLatitude ?? 31.03}
-        longitude={effectiveLongitude ?? 121.21}
+        latitude={effectiveLatitude ?? 31.0282}
+        longitude={effectiveLongitude ?? 121.4346}
         capsules={nearby ? [...nearby.recommended, ...nearby.others] : []}
       />
 

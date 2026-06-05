@@ -31,11 +31,11 @@ export default function MapView({
       attributionControl: true,
     })
 
-    // CartoDB Dark Matter — 暗色主题，免费无需 token
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
-      subdomains: 'abcd',
-      maxZoom: 20,
+    // 高德地图瓦片 — 国内快速访问
+    L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+      attribution: '&copy; 高德地图',
+      subdomains: '1234',
+      maxZoom: 18,
     }).addTo(map.current)
 
     // Zoom control top-right
@@ -102,5 +102,7 @@ export default function MapView({
     })
   }, [capsules, latitude, longitude, onCapsuleClick])
 
-  return <div ref={mapContainer} className="absolute inset-0 w-full h-full" />
+  return <div ref={mapContainer} className="absolute inset-0 w-full h-full" style={{
+    filter: 'invert(1) hue-rotate(180deg) brightness(0.95) contrast(0.9) saturate(0.8)',
+  }} />
 }
