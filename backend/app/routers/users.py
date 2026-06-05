@@ -3,6 +3,7 @@ User management routes.
 """
 import uuid
 import json
+from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException
 
 from ..database import get_db
@@ -30,7 +31,7 @@ async def create_user(data: UserCreate):
             id=user_id,
             name=data.name,
             interest_tags=data.interest_tags,
-            created_at="just now",
+            created_at=datetime.now(timezone.utc).isoformat(),
         )
     finally:
         await db.close()
