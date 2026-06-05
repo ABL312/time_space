@@ -180,8 +180,11 @@ async def get_nearby(
             if row and row[0]:
                 try:
                     user_interest_tags = json.loads(row[0])
+                    # Ensure it's a list
+                    if not isinstance(user_interest_tags, list):
+                        user_interest_tags = []
                 except (json.JSONDecodeError, TypeError):
-                    pass
+                    user_interest_tags = []
 
         # Parse scene mood match if provided
         scene_moods = None

@@ -40,7 +40,7 @@ def calculate_match_score(
             except (json.JSONDecodeError, TypeError):
                 emotion_tags = []
         else:
-            emotion_tags = emotion_tags_raw
+            emotion_tags = emotion_tags_raw if isinstance(emotion_tags_raw, list) else []
     else:
         emotion_tags = []
 
