@@ -5,7 +5,10 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
   plugins: [
-    react(),
+    react({
+      // Disable Fast Refresh for debugging
+      fastRefresh: false,
+    }),
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
