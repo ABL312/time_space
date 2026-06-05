@@ -3,21 +3,16 @@ Capsule CRUD and nearby query routes.
 """
 import uuid
 import json
-import os
-from pathlib import Path
 from typing import Optional
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
-from PIL import Image
-import io
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 
 from ..database import get_db
 from ..models import CapsuleResponse, NearbyResponse
 from ..services.geohash_service import encode, find_nearby_capsules, haversine_distance
 from ..services.recommend_service import rank_capsules
+from ..services.storage_service import storage_service
 
 router = APIRouter(prefix="/api/capsules", tags=["capsules"])
-
-UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "./data/uploads"))
 
 
 def _parse_capsule_row(row: dict) -> dict:
@@ -72,35 +67,16 @@ async def create_capsule(
              message, mood_tag, visibility, target_user_id),
         )
 
-        # Handle photo uploads
-        photo_urls = []
+        # Handle photo uploads via StorageService
         for i, photo in enumerate(photos[:5]):  # Max 5 photos
-            if photo.content_type not in ("image/jpeg", "image/png", "image/webp"):
+            # Skip empty file slots (browser sometimes sends empty UploadFile)
+            if not photo.filename and not photo.content_type:
                 continue
-            
-            # Read and compress image
-            content = await photo.read()
-            img = Image.open(io.BytesIO(content))
-            
-            # Resize if too large
-            img.thumbnail((1200, 1200), Image.LANCZOS)
-            
-            # Save compressed version
-            photo_filename = f"{capsule_id}_{i}.jpg"
-            photo_path = UPLOAD_DIR / "photos" / photo_filename
-            photo_path.parent.mkdir(parents=True, exist_ok=True)
-            img.save(str(photo_path), "JPEG", quality=85)
-            
-            # Save thumbnail
-            thumb = img.copy()
-            thumb.thumbnail((200, 200), Image.LANCZOS)
-            thumb_filename = f"thumb_{capsule_id}_{i}.jpg"
-            thumb_path = UPLOAD_DIR / "thumbnails" / thumb_filename
-            thumb_path.parent.mkdir(parents=True, exist_ok=True)
-            thumb.save(str(thumb_path), "JPEG", quality=80)
-
-            photo_url = f"/uploads/photos/{photo_filename}"
-            thumb_url = f"/uploads/thumbnails/{thumb_filename}"
+            try:
+                result = await storage_service.save_photo(photo)
+            except HTTPException:
+                # Skip invalid photos rather than failing the whole request
+                continue
 
             media_id = str(uuid.uuid4())
             await db.execute(
@@ -108,25 +84,22 @@ async def create_capsule(
                 INSERT INTO media (id, capsule_id, type, url, thumbnail_url, sort_order)
                 VALUES (?, ?, 'photo', ?, ?, ?)
                 """,
-                (media_id, capsule_id, photo_url, thumb_url, i),
+                (media_id, capsule_id, result["url"], result["thumbnail_url"], i),
             )
-            photo_urls.append(photo_url)
 
-        # Handle voice upload
-        voice_url = None
-        if voice and voice.content_type and voice.content_type.startswith("audio/"):
-            voice_filename = f"{capsule_id}.webm"
-            voice_path = UPLOAD_DIR / "voices" / voice_filename
-            voice_path.parent.mkdir(parents=True, exist_ok=True)
-            content = await voice.read()
-            with open(str(voice_path), "wb") as f:
-                f.write(content)
-            voice_url = f"/uploads/voices/{voice_filename}"
+        # Handle voice upload via StorageService
+        if voice and voice.filename:
+            try:
+                result = await storage_service.save_voice(voice)
+                voice_url = result["url"]
 
-            await db.execute(
-                "UPDATE capsules SET voice_url = ? WHERE id = ?",
-                (voice_url, capsule_id),
-            )
+                await db.execute(
+                    "UPDATE capsules SET voice_url = ? WHERE id = ?",
+                    (voice_url, capsule_id),
+                )
+            except HTTPException:
+                # Skip invalid voice rather than failing the whole request
+                pass
 
         await db.commit()
 
@@ -300,6 +273,24 @@ async def reply_to_capsule(
             """,
             (reply_id, author_id, lat, lng, geohash, message),
         )
+
+        # Handle photos via StorageService
+        for i, photo in enumerate(photos[:5]):
+            if not photo.filename and not photo.content_type:
+                continue
+            try:
+                result = await storage_service.save_photo(photo)
+            except HTTPException:
+                continue
+
+            media_id = str(uuid.uuid4())
+            await db.execute(
+                """
+                INSERT INTO media (id, capsule_id, type, url, thumbnail_url, sort_order)
+                VALUES (?, ?, 'photo', ?, ?, ?)
+                """,
+                (media_id, reply_id, result["url"], result["thumbnail_url"], i),
+            )
 
         # Record interaction
         interaction_id = str(uuid.uuid4())

@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 from .database import init_db
-from .routers import capsules, users, ai
+from .routers import capsules, users, ai, upload
 
 # Load environment variables
 load_dotenv()
@@ -64,8 +64,8 @@ app.add_middleware(
 # ==========================================
 # Static files (uploads)
 # ==========================================
-if UPLOAD_DIR.exists():
-    app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+app.mount("/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
 
 # ==========================================
 # Routers
@@ -73,6 +73,7 @@ if UPLOAD_DIR.exists():
 app.include_router(users.router)
 app.include_router(capsules.router)
 app.include_router(ai.router)
+app.include_router(upload.router)
 
 
 # ==========================================
