@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from dotenv import load_dotenv
 
 from .database import init_db
-from .routers import capsules, users, ai, upload
+from .routers import capsules, users, ai, upload, admin
 
 # Load environment variables
 load_dotenv()
@@ -74,6 +74,7 @@ app.include_router(users.router)
 app.include_router(capsules.router)
 app.include_router(ai.router)
 app.include_router(upload.router)
+app.include_router(admin.router)
 
 
 # ==========================================
