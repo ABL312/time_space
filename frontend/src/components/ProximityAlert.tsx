@@ -1,4 +1,3 @@
-import { motion, AnimatePresence } from 'framer-motion'
 import type { Capsule } from '../types'
 
 interface ProximityAlertProps {
@@ -15,14 +14,12 @@ export default function ProximityAlert({
   onView
 }: ProximityAlertProps) {
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ y: '100%', opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: '100%', opacity: 0 }}
-        transition={{ type: 'spring', damping: 20, stiffness: 300 }}
-        className="fixed bottom-4 left-4 right-4 z-50 hud panel slide-up"
-      >
+    <div
+      className="fixed bottom-4 left-4 right-4 z-50 hud panel animate-slide-up"
+      style={{
+        animation: 'slide-up 0.3s ease-out forwards'
+      }}
+    >
         <div className="p-4">
           <div className="flex items-start justify-between mb-2">
             <div className="flex-1 min-w-0">
@@ -54,7 +51,6 @@ export default function ProximityAlert({
             </button>
           </div>
         </div>
-      </motion.div>
-    </AnimatePresence>
+      </div>
   )
 }
