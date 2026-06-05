@@ -205,9 +205,13 @@ async def get_nearby(
         # Format responses
         def format_capsule(c: dict) -> dict:
             parsed = _parse_capsule_row(c)
+            # Handle None values for required string fields
+            author_id = parsed.get("author_id") or ""
+            created_at = str(parsed.get("created_at", ""))
+            
             return CapsuleResponse(
                 id=parsed["id"],
-                author_id=parsed.get("author_id", ""),
+                author_id=author_id,
                 author=parsed.get("author"),
                 latitude=parsed["latitude"],
                 longitude=parsed["longitude"],
@@ -223,7 +227,7 @@ async def get_nearby(
                 mood_tag=parsed.get("mood_tag"),
                 visibility=parsed.get("visibility", "public"),
                 open_count=parsed.get("open_count", 0),
-                created_at=str(parsed.get("created_at", "")),
+                created_at=created_at,
                 distance_m=parsed.get("distance_m"),
                 match_score=parsed.get("match_score"),
                 match_reasons=parsed.get("match_reasons"),

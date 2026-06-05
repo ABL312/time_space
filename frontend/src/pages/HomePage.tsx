@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGeolocation } from '../hooks/useGeolocation'
+import { useVirtualLocation } from '../hooks/useVirtualLocation'
 import { useCapsuleStore } from '../stores/capsuleStore'
 import { useUserStore } from '../stores/userStore'
 import { useCapabilityCheck } from '../hooks/useCapabilityCheck'
@@ -12,24 +13,29 @@ import ProximityAlert from '../components/ProximityAlert'
 export default function HomePage() {
   const navigate = useNavigate()
   const { latitude, longitude, error: geoError } = useGeolocation()
+  const { virtualLocation, setVirtual } = useVirtualLocation()
   const { user } = useUserStore()
   const { fetchNearby, nearby, isLoadingNearby } = useCapsuleStore()
   const cap = useCapabilityCheck()
   
+  // 优先使用虚拟位置，否则使用真实位置
+  const effectiveLatitude = virtualLocation?.lat ?? latitude
+  const effectiveLongitude = virtualLocation?.lng ?? longitude
+  
   // Proximity alert hook
   const { triggeredCapsule, distance, dismiss } = useProximityAlert({
-    userLat: latitude,
-    userLng: longitude,
+    userLat: effectiveLatitude,
+    userLng: effectiveLongitude,
     nearbyCapsules: nearby ? [...nearby.recommended, ...nearby.others] : []
   })
 
   const radius = cap.useExpandedGPS ? 5000 : 1200
 
   useEffect(() => {
-    if (latitude && longitude && user) {
-      fetchNearby({ lat: latitude, lng: longitude, radius, user_id: user.id })
+    if (effectiveLatitude && effectiveLongitude && user) {
+      fetchNearby({ lat: effectiveLatitude, lng: effectiveLongitude, radius, user_id: user.id })
     }
-  }, [latitude, longitude, user, fetchNearby, radius])
+  }, [effectiveLatitude, effectiveLongitude, user, fetchNearby, radius])
 
   const handleExplore = () => {
     if (cap.shouldSkipAR) {
@@ -44,22 +50,25 @@ export default function HomePage() {
     <div className="relative h-screen w-screen overflow-hidden bg-void">
       {/* Map */}
       <MapView
-        latitude={latitude ?? 31.03}
-        longitude={longitude ?? 121.21}
+        latitude={effectiveLatitude ?? 31.03}
+        longitude={effectiveLongitude ?? 121.21}
         capsules={nearby ? [...nearby.recommended, ...nearby.others] : []}
       />
 
       {/* ── TOP HUD OVERLAY ── */}
       <div className="absolute top-3 left-3 right-3 z-20 space-y-2">
         {/* Coordinate readout */}
-        {latitude && longitude && (
+        {effectiveLatitude && effectiveLongitude && (
           <div className="hud px-3 py-2 inline-flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <div className={`w-1.5 h-1.5 ${cap.isOnline ? 'bg-data-good breathe' : 'bg-data-bad'}`} />
-              <span className="data">
-                {latitude.toFixed(4)}°N <span className="text-slate-600">/</span> {longitude.toFixed(4)}°E
+            <div className={`w-1.5 h-1.5 ${cap.isOnline ? 'bg-data-good breathe' : 'bg-data-bad'}`} />
+            <span className="data">
+              {effectiveLatitude.toFixed(4)}°N <span className="text-slate-600">/</span> {effectiveLongitude.toFixed(4)}°E
+            </span>
+            {virtualLocation && (
+              <span className="data text-data-warn border border-data-warn/30 px-1.5 py-0.5">
+                VIRTUAL LOCATION
               </span>
-            </div>
+            )}
             {cap.useExpandedGPS && (
               <span className="data text-data-warn border border-data-warn/30 px-1.5 py-0.5">
                 GPS DEGRADED
@@ -116,6 +125,22 @@ export default function HomePage() {
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+        </button>
+        {/* 虚拟定位设置按钮 */}
+        <button
+          onClick={() => {
+            const lat = prompt('输入纬度 (例如: 31.0282)', '31.0282')
+            const lng = prompt('输入经度 (例如: 121.4346)', '121.4346')
+            if (lat && lng) {
+              setVirtual(parseFloat(lat), parseFloat(lng))
+            }
+          }}
+          className="btn w-11 h-11 border border-data-warn/25 bg-data-warn/5 flex items-center justify-center text-data-warn"
+          title="Set Virtual Location"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
           </svg>
         </button>
       </div>
