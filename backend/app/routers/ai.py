@@ -14,6 +14,7 @@ from ..models import (
     LocationContextResponse,
     VoiceCloneResponse,
 )
+from ..config import config
 from ..services.emotion_service import emotion_service
 from ..services.location_service import LocationService
 from ..services.scene_service import SceneService
@@ -25,10 +26,6 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 # Initialize services
 location_service = LocationService()
 scene_service = SceneService()
-
-# Check for API keys
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
 
 
 @router.post("/analyze-emotion", response_model=EmotionAnalysisResponse)

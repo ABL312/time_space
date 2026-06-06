@@ -12,6 +12,8 @@ from typing import Optional
 
 from fastapi import HTTPException, UploadFile
 
+from ..config import config
+
 # Try to import Pillow; fall back gracefully if unavailable.
 try:
     from PIL import Image
@@ -23,9 +25,11 @@ except ImportError:
 class StorageService:
     """Centralized file upload service with validation and media processing."""
 
-    UPLOAD_DIR = Path(os.getenv("UPLOAD_DIR", "./data/uploads"))
-    MAX_PHOTO_SIZE = 5 * 1024 * 1024       # 5 MB
-    MAX_VOICE_SIZE = 10 * 1024 * 1024       # 10 MB
+    def __init__(self):
+        self._upload_dir = config.upload_dir
+        self._max_photo_size = config.max_photo_size_mb * 1024 * 1024
+        self._max_voice_size = config.max_voice_size_mb * 1024 * 1024
+
     MAX_PHOTO_LONG_EDGE = 1200              # px – compress target
     THUMBNAIL_SIZE = 200                    # px – thumbnail long edge
     JPEG_QUALITY = 85
@@ -66,16 +70,36 @@ class StorageService:
             HTTPException 400 – bad content type or magic bytes mismatch
             HTTPException 413 – file too large
         """
+        # 0. Pre-check Content-Length header (avoid reading oversized files)
+        content_length = file.headers.get("content-length")
+        if content_length:
+            try:
+                size = int(content_length)
+                if size > self._max_photo_size:
+                    raise HTTPException(
+                        status_code=413,
+                        detail={
+                            "error": "file_too_large",
+                            "message": f"Photo exceeds maximum size of {config.max_photo_size_mb} MB",
+                            "size_bytes": size,
+                            "max_bytes": self._max_photo_size,
+                        },
+                    )
+            except (ValueError, TypeError):
+                pass  # Invalid content-length header, fall through to read-and-check
+
         content = await file.read()
 
-        # 1. Size check
-        if len(content) > self.MAX_PHOTO_SIZE:
+        # 1. Size check (belt-and-suspenders with Content-Length pre-check)
+        if len(content) > self._max_photo_size:
             raise HTTPException(
                 status_code=413,
-                detail=(
-                    f"Photo too large ({len(content)} bytes). "
-                    f"Max allowed: {self.MAX_PHOTO_SIZE // (1024*1024)} MB."
-                ),
+                detail={
+                    "error": "file_too_large",
+                    "message": f"Photo exceeds maximum size of {config.max_photo_size_mb} MB",
+                    "size_bytes": len(content),
+                    "max_bytes": self._max_photo_size,
+                },
             )
 
         # 2. Content-type check
@@ -83,25 +107,30 @@ class StorageService:
         if content_type not in self.ALLOWED_IMAGE_TYPES:
             raise HTTPException(
                 status_code=400,
-                detail=f"Image type '{content_type}' not allowed. "
-                       f"Accepted: {', '.join(sorted(self.ALLOWED_IMAGE_TYPES))}",
+                detail={
+                    "error": "invalid_content_type",
+                    "message": f"Image type '{content_type}' not supported",
+                    "accepted_types": sorted(self.ALLOWED_IMAGE_TYPES),
+                },
             )
 
         # 3. Magic-bytes validation
         if not self._validate_image_magic(content):
             raise HTTPException(
                 status_code=400,
-                detail="File content does not match any supported image format "
-                       "(magic bytes check failed).",
+                detail={
+                    "error": "invalid_file_content",
+                    "message": "File content does not match any supported image format",
+                },
             )
 
         # 4. Generate unique filename
         filename = f"{uuid.uuid4().hex}.jpg"
-        photo_path = self.UPLOAD_DIR / "photos" / filename
+        photo_path = self._upload_dir / "photos" / filename
         photo_path.parent.mkdir(parents=True, exist_ok=True)
 
         thumb_filename = f"thumb_{filename}"
-        thumb_path = self.UPLOAD_DIR / "thumbnails" / thumb_filename
+        thumb_path = self._upload_dir / "thumbnails" / thumb_filename
         thumb_path.parent.mkdir(parents=True, exist_ok=True)
 
         # 5. Compress & save (with Pillow fallback)
@@ -159,13 +188,15 @@ class StorageService:
         content = await file.read()
 
         # 1. Size check
-        if len(content) > self.MAX_VOICE_SIZE:
+        if len(content) > self._max_voice_size:
             raise HTTPException(
                 status_code=413,
-                detail=(
-                    f"Voice file too large ({len(content)} bytes). "
-                    f"Max allowed: {self.MAX_VOICE_SIZE // (1024*1024)} MB."
-                ),
+                detail={
+                    "error": "file_too_large",
+                    "message": f"Voice file exceeds maximum size of {config.max_voice_size_mb} MB",
+                    "size_bytes": len(content),
+                    "max_bytes": self._max_voice_size,
+                },
             )
 
         # 2. Content-type check
@@ -173,8 +204,11 @@ class StorageService:
         if content_type not in self.ALLOWED_VOICE_TYPES:
             raise HTTPException(
                 status_code=400,
-                detail=f"Voice type '{content_type}' not allowed. "
-                       f"Accepted: {', '.join(sorted(self.ALLOWED_VOICE_TYPES))}",
+                detail={
+                    "error": "invalid_content_type",
+                    "message": f"Voice type '{content_type}' not supported",
+                    "accepted_types": sorted(self.ALLOWED_VOICE_TYPES),
+                },
             )
 
         # 3. Determine extension from content type
@@ -189,7 +223,7 @@ class StorageService:
         ext = ext_map.get(content_type, "webm")
         filename = f"{uuid.uuid4().hex}.{ext}"
 
-        voice_path = self.UPLOAD_DIR / "voices" / filename
+        voice_path = self._upload_dir / "voices" / filename
         voice_path.parent.mkdir(parents=True, exist_ok=True)
 
         self._write_bytes(voice_path, content)

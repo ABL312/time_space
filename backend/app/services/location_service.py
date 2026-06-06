@@ -4,6 +4,7 @@ import os
 import httpx
 from typing import Dict, List
 from ..services.geohash_service import find_nearby_capsules
+from ..config import config
 
 
 class LocationService:
@@ -180,8 +181,7 @@ class LocationService:
 
     def _generate_description(self, place_name: str, place_type: str) -> str:
         """Generate location description. GPT if available, else template."""
-        # Check if we have an OpenAI API key
-        api_key = os.getenv("OPENAI_API_KEY", "")
+        api_key = config.openai_api_key
         
         # Normalize place_type for template matching
         normalized_type = place_type.lower().strip()

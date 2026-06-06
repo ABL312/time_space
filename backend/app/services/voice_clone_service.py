@@ -1,19 +1,24 @@
 """Voice cloning service using ElevenLabs API with fallback support."""
 
 import os
+import asyncio
 import uuid
 from pathlib import Path
 from typing import Dict, Any
 from elevenlabs import ElevenLabs, VoiceSettings
 from elevenlabs.client import AsyncElevenLabs
+from ..config import config
+
+# Timeout for ElevenLabs API calls (voice clone + TTS can be slow)
+ELEVENLABS_TIMEOUT = 30.0  # seconds
 
 
 class VoiceCloneService:
     """ElevenLabs voice cloning + TTS service."""
     
     def __init__(self):
-        self.api_key = os.getenv("ELEVENLABS_API_KEY", "")
-        self.upload_dir = Path(os.getenv("UPLOAD_DIR", "./data/uploads"))
+        self.api_key = config.elevenlabs_api_key
+        self.upload_dir = config.upload_dir
         self.voice_clones_dir = self.upload_dir / "voice_clones"
         self.voice_clones_dir.mkdir(parents=True, exist_ok=True)
         
@@ -37,7 +42,13 @@ class VoiceCloneService:
             return self._fallback_response()
             
         try:
-            return await self._clone_with_elevenlabs(sample_bytes, sample_filename, text)
+            return await asyncio.wait_for(
+                self._clone_with_elevenlabs(sample_bytes, sample_filename, text),
+                timeout=ELEVENLABS_TIMEOUT,
+            )
+        except asyncio.TimeoutError:
+            print(f"⚠️ Voice cloning timed out after {ELEVENLABS_TIMEOUT}s")
+            return self._fallback_response()
         except Exception as e:
             print(f"⚠️ Voice cloning error: {e}")
             return self._fallback_response()

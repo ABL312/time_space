@@ -1,9 +1,15 @@
 """Analyze camera/photo images for scene context using GPT-4o Vision."""
 
 import os
+import asyncio
 import base64
 from typing import Dict, List, Optional
 from ..services.location_service import LocationService
+from ..config import config
+
+# Safety limits
+MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB — reject images larger than this
+GPT_VISION_TIMEOUT = 10.0            # seconds for GPT-4o Vision API call
 
 
 class SceneService:
@@ -29,18 +35,26 @@ class SceneService:
             "mood_match": ["青春", "怀旧", "友情"]
         }
         """
+        # Safety: reject oversized images before base64 encoding
+        if len(image_bytes) > MAX_IMAGE_BYTES:
+            print(f"⚠️ Scene image too large ({len(image_bytes)} bytes), using fallback")
+            return await self._fallback_scene(lat, lng)
+
         # 1. Try GPT-4o Vision (if OPENAI_API_KEY available)
         try:
-            if os.getenv("OPENAI_API_KEY", ""):
-                result = await self._analyze_with_gpt(image_bytes)
+            if config.openai_api_key:
+                result = await asyncio.wait_for(
+                    self._analyze_with_gpt(image_bytes),
+                    timeout=GPT_VISION_TIMEOUT,
+                )
                 if result:
                     return result
+        except asyncio.TimeoutError:
+            print(f"⚠️ GPT-4o Vision timed out after {GPT_VISION_TIMEOUT}s")
         except Exception as e:
             print(f"⚠️ GPT-4o Vision analysis failed: {e}")
         
         # 2. Fallback (no API key or timeout):
-        #    Return generic scene based on GPS location (use LocationService)
-        #    Or return default: scene_type="未知", description="一个充满故事的地方", mood_match=["温暖","希望"]
         return await self._fallback_scene(lat, lng)
 
     async def _analyze_with_gpt(self, image_bytes: bytes) -> Optional[Dict]:
@@ -51,7 +65,7 @@ class SceneService:
         # Convert image to base64
         image_base64 = base64.b64encode(image_bytes).decode('utf-8')
         
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        client = OpenAI(api_key=config.openai_api_key)
         
         response = client.chat.completions.create(
             model="gpt-4o",

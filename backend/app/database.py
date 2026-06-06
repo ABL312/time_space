@@ -88,12 +88,23 @@ CREATE TABLE IF NOT EXISTS responses (
     FOREIGN KEY (capsule_id) REFERENCES capsules(id)
 );
 
--- Indexes for fast nearby queries
+-- Indexes for fast nearby queries (legacy)
 CREATE INDEX IF NOT EXISTS idx_capsules_geohash ON capsules(geohash);
 CREATE INDEX IF NOT EXISTS idx_capsules_location ON capsules(latitude, longitude);
 CREATE INDEX IF NOT EXISTS idx_media_capsule ON media(capsule_id);
 CREATE INDEX IF NOT EXISTS idx_interactions_capsule ON interactions(capsule_id);
 CREATE INDEX IF NOT EXISTS idx_interactions_user ON interactions(user_id);
+
+-- Performance indexes added in backend-refactor-02 (#36)
+-- capsules indexes
+CREATE INDEX IF NOT EXISTS idx_capsules_author ON capsules(author_id);
+CREATE INDEX IF NOT EXISTS idx_capsules_visibility ON capsules(visibility, created_at);
+CREATE INDEX IF NOT EXISTS idx_capsules_open_emotion ON capsules(open_count, emotion_intensity);
+CREATE INDEX IF NOT EXISTS idx_capsules_created ON capsules(created_at);
+-- responses index
+CREATE INDEX IF NOT EXISTS idx_responses_capsule ON responses(capsule_id, created_at);
+-- interactions index
+CREATE INDEX IF NOT EXISTS idx_interactions_created ON interactions(created_at);
 
 CREATE TABLE IF NOT EXISTS favorites (
     id TEXT PRIMARY KEY,
@@ -103,6 +114,10 @@ CREATE TABLE IF NOT EXISTS favorites (
     UNIQUE(user_id, capsule_id),
     FOREIGN KEY (capsule_id) REFERENCES capsules(id)
 );
+
+-- favorites indexes (#36)
+CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_favorites_capsule ON favorites(capsule_id);
 
 CREATE TABLE IF NOT EXISTS collections (
     id TEXT PRIMARY KEY,
@@ -114,6 +129,9 @@ CREATE TABLE IF NOT EXISTS collections (
     view_count INTEGER DEFAULT 0,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- collections index (#36)
+CREATE INDEX IF NOT EXISTS idx_collections_creator ON collections(creator_id);
 """
 
 
@@ -131,6 +149,8 @@ async def init_db():
     """Initialize database schema (call on app startup)."""
     DB_DIR.mkdir(parents=True, exist_ok=True)
     async with aiosqlite.connect(str(DB_PATH)) as db:
+        await db.execute("PRAGMA journal_mode=WAL")
+        await db.execute("PRAGMA foreign_keys=ON")
         await db.executescript(SCHEMA_SQL)
         await db.commit()
     print(f"✅ Database initialized at {DB_PATH}")

@@ -6,6 +6,8 @@ import os
 import json
 from typing import Optional
 
+from ..config import config
+
 
 class EmotionService:
     """Analyze capsule messages for emotional tags using GPT-4o-mini with keyword fallback."""
@@ -42,7 +44,7 @@ class EmotionService:
     }
 
     def __init__(self):
-        self.api_key = os.getenv("OPENAI_API_KEY", "")
+        self.api_key = config.openai_api_key
 
     async def analyze(self, message: str) -> dict:
         """
