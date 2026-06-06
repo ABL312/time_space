@@ -8,6 +8,8 @@ venv/
 # Build outputs
 frontend/dist/
 *.egg-info/
+go-backend/server
+go-backend/server.exe
 
 # Environment files
 .env
@@ -36,13 +38,13 @@ backend/data/uploads/thumbnails/*
 !backend/data/uploads/thumbnails/.gitkeep
 
 # Database
-backend/data/*.db
-backend/data/*.db-wal
-backend/data/*.db-shm
-backend/app/*.db
-*.db-wal
+*.db
+*.sqlite
+*.sqlite3
 *.db-shm
-time_spacedatatimespace.db
+*.db-wal
+backend/data/
+go-backend/data/
 
 # PWA
 frontend/public/workbox-*.js
@@ -53,8 +55,9 @@ frontend/public/sw.js.map
 *.log
 
 # Docs / handover files
-docs/
-!backend/docs/
+docs/*
+!docs/go-backend-api-contract.md
+!docs/performance-baseline.md
 
 # Local HTTPS certificates (mkcert)
 *.pem
