@@ -91,8 +91,10 @@ export function useProximityAlert({
       }
     }
 
-    // Trigger alert if we found a capsule
+    // Trigger alert if we found a capsule within threshold
     if (closestCapsule && minDistance !== null) {
+      // setState here syncs external proximity detection into React state
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTriggeredCapsule(closestCapsule)
       setDistance(minDistance)
       

@@ -8,7 +8,7 @@
  * This file exists for backward compatibility with existing pages.
  */
 
-export { request, upload, buildQuery, ApiError } from './client'
+export { request, upload, buildQuery, ApiError, getErrorMessage } from './client'
 
 // Re-export all feature APIs
 export { usersApi } from './usersApi'

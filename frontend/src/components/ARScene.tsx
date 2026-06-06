@@ -1,7 +1,8 @@
-import { useEffect, useRef } from 'react'
-import * as THREE from 'three'
+import { useEffect, useRef, useState } from 'react'
 import type { Capsule } from '../types'
 import { haversineDistance, calculateBearing } from '../hooks/useGeolocation'
+
+type THREE = typeof import('three')
 
 interface ARSceneProps {
   userLat: number
@@ -19,15 +20,36 @@ export default function ARScene({
   onCapsuleClick,
 }: ARSceneProps) {
   const containerRef = useRef<HTMLDivElement>(null)
-  const sceneRef = useRef<THREE.Scene | null>(null)
-  const rendererRef = useRef<THREE.WebGLRenderer | null>(null)
-  const cameraRef = useRef<THREE.PerspectiveCamera | null>(null)
-  const capsuleMeshesRef = useRef<Map<string, THREE.Group>>(new Map())
+  const THREERef = useRef<THREE | null>(null)
+  // Use `unknown` for Three.js instance refs to avoid top-level type dependency
+  const sceneRef = useRef<unknown>(null)
+  const rendererRef = useRef<unknown>(null)
+  const cameraRef = useRef<unknown>(null)
+  const capsuleMeshesRef = useRef<Map<string, unknown>>(new Map())
   const animFrameRef = useRef<number>(0)
+  const [threeReady, setThreeReady] = useState(false)
+  // Keep latest callback in a ref to avoid re-creating the raycasting effect
+  const onCapsuleClickRef = useRef(onCapsuleClick)
+  useEffect(() => {
+    onCapsuleClickRef.current = onCapsuleClick
+  }, [onCapsuleClick])
+
+  // Lazy-load Three.js
+  useEffect(() => {
+    let disposed = false
+    import('three').then((mod) => {
+      if (disposed) return
+      THREERef.current = mod as unknown as THREE
+      setThreeReady(true)
+    })
+    return () => { disposed = true }
+  }, [])
 
   // Initialize Three.js scene
   useEffect(() => {
-    if (!containerRef.current) return
+    const container = containerRef.current
+    const THREE = THREERef.current
+    if (!container || !THREE) return
 
     // Scene
     const scene = new THREE.Scene()
@@ -50,7 +72,7 @@ export default function ARScene({
     renderer.setSize(window.innerWidth, window.innerHeight)
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     rendererRef.current = renderer
-    containerRef.current.appendChild(renderer.domElement)
+    container.appendChild(renderer.domElement)
 
     // Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6)
@@ -76,25 +98,25 @@ export default function ARScene({
       window.removeEventListener('resize', handleResize)
       cancelAnimationFrame(animFrameRef.current)
       renderer.dispose()
-      if (containerRef.current && renderer.domElement) {
-        containerRef.current.removeChild(renderer.domElement)
+      if (container && renderer.domElement) {
+        container.removeChild(renderer.domElement)
       }
     }
-  }, [])
+  }, [threeReady])
 
   // Update capsule positions based on GPS + orientation
   useEffect(() => {
-    if (!sceneRef.current || !cameraRef.current || !rendererRef.current) return
-
-    const scene = sceneRef.current
-    const camera = cameraRef.current
-    const renderer = rendererRef.current
+    const THREE = THREERef.current
+    const scene = sceneRef.current as import('three').Scene | null
+    const camera = cameraRef.current as import('three').PerspectiveCamera | null
+    const renderer = rendererRef.current as import('three').WebGLRenderer | null
+    if (!scene || !camera || !renderer || !THREE) return
 
     // Remove old meshes that are no longer in capsules list
     const currentIds = new Set(capsules.map((c) => c.id))
     capsuleMeshesRef.current.forEach((mesh, id) => {
       if (!currentIds.has(id)) {
-        scene.remove(mesh)
+        scene.remove(mesh as import('three').Object3D)
         capsuleMeshesRef.current.delete(id)
       }
     })
@@ -107,9 +129,9 @@ export default function ARScene({
       // Only render capsules within 500m
       if (distance > 500) return
 
-      let group = capsuleMeshesRef.current.get(capsule.id)
+      let group = capsuleMeshesRef.current.get(capsule.id) as import('three').Group | undefined
       if (!group) {
-        group = createCapsuleMesh(capsule)
+        group = createCapsuleMesh(THREE, capsule)
         scene.add(group)
         capsuleMeshesRef.current.set(capsule.id, group)
       }
@@ -153,14 +175,16 @@ export default function ARScene({
 
       // Calculate objects intersecting the picking ray
       const intersects = raycaster.intersectObjects(
-        Array.from(capsuleMeshesRef.current.values()).filter(mesh => mesh.visible),
+        Array.from(capsuleMeshesRef.current.values()).filter(
+          (m) => (m as import('three').Object3D).visible
+        ) as import('three').Object3D[],
         true
       )
 
       if (intersects.length > 0) {
-        const clickedGroup = intersects[0].object.parent as THREE.Group
+        const clickedGroup = intersects[0].object.parent as import('three').Group
         if (clickedGroup && clickedGroup.userData.capsuleId) {
-          onCapsuleClick(clickedGroup.userData.capsuleId)
+          onCapsuleClickRef.current(clickedGroup.userData.capsuleId)
         }
       }
     }
@@ -172,9 +196,10 @@ export default function ARScene({
       // Float animation for all visible capsules
       const time = Date.now() * 0.001
       capsuleMeshesRef.current.forEach((group) => {
-        if (group.visible) {
-          group.position.y += Math.sin(time * 2 + group.position.x) * 0.001
-          group.rotation.y += 0.005
+        const g = group as import('three').Group
+        if (g.visible) {
+          g.position.y += Math.sin(time * 2 + g.position.x) * 0.001
+          g.rotation.y += 0.005
         }
       })
 
@@ -188,11 +213,14 @@ export default function ARScene({
     return () => {
       cancelAnimationFrame(animFrameRef.current)
       // Clean up event listener
-      if (rendererRef.current?.domElement) {
-        rendererRef.current.domElement.removeEventListener('click', handleClick)
+      if (rendererRef.current) {
+        const r = rendererRef.current as import('three').WebGLRenderer
+        if (r.domElement) {
+          r.domElement.removeEventListener('click', handleClick)
+        }
       }
     }
-  }, [userLat, userLng, deviceAlpha, capsules])
+  }, [userLat, userLng, deviceAlpha, capsules, threeReady])
 
   return (
     <div
@@ -204,7 +232,7 @@ export default function ARScene({
 }
 
 /** Create a 3D envelope mesh group */
-function createCapsuleMesh(capsule: Capsule): THREE.Group {
+function createCapsuleMesh(THREE: THREE, capsule: Capsule): import('three').Group {
   const group = new THREE.Group()
 
   // Envelope body

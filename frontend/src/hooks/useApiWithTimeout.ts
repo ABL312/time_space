@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { capsulesApi } from '../lib/api'
 import type { NearbyResponse } from '../types'
 
@@ -13,16 +13,14 @@ export function useApiWithTimeout<T>(
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
-  const [retryCount, setRetryCount] = useState<number>(0)
 
   const { timeout = 5000 } = options
 
-  const execute = async () => {
+  const execute = useCallback(async () => {
     setLoading(true)
     setError(null)
     
     try {
-      // Execute API call with timeout
       const result = await Promise.race([
         apiCall(),
         new Promise<never>((_, reject) => 
@@ -40,17 +38,11 @@ export function useApiWithTimeout<T>(
     } finally {
       setLoading(false)
     }
-  }
+  }, [apiCall, timeout])
 
-  const retry = () => {
-    setRetryCount(prev => prev + 1)
-  }
-
-  useEffect(() => {
-    if (retryCount > 0) {
-      execute()
-    }
-  }, [retryCount])
+  const retry = useCallback(() => {
+    execute()
+  }, [execute])
 
   return { data, loading, error, retry, execute }
 }
@@ -66,15 +58,15 @@ export function useNearbyCapsules() {
     }
   )
 
-  const fetchNearby = (newParams: { lat: number; lng: number; radius?: number; user_id?: string }) => {
+  const fetchNearby = useCallback((newParams: { lat: number; lng: number; radius?: number; user_id?: string }) => {
     setParams(newParams)
-  }
+  }, [])
 
   useEffect(() => {
     if (params) {
       execute()
     }
-  }, [params])
+  }, [params, execute])
 
   return { nearby: data, isLoading: loading, error, retry, fetchNearby }
 }

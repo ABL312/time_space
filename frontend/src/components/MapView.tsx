@@ -3,6 +3,15 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet.heat'
 import type { Capsule } from '../types'
+import Button from './ui/Button'
+
+// leaflet.heat augments L with heatLayer but ships no types
+declare module 'leaflet' {
+  function heatLayer(
+    latlngs: Array<[number, number, number]>,
+    options?: Record<string, unknown>
+  ): L.Layer
+}
 
 interface MapViewProps {
   latitude: number
@@ -20,7 +29,7 @@ export default function MapView({
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map | null>(null)
   const markersRef = useRef<L.LayerGroup | null>(null)
-  const heatLayerRef = useRef<any>(null)
+  const heatLayerRef = useRef<L.Layer | null>(null)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
   const [showHeatmap, setShowHeatmap] = useState(false)
 
@@ -173,7 +182,7 @@ export default function MapView({
       ])
 
       // Create and add heat layer
-      heatLayerRef.current = (L as any).heatLayer(heatData, {
+      heatLayerRef.current = L.heatLayer(heatData as Array<[number, number, number]>, {
         radius: 25,
         blur: 15,
         maxZoom: 17,
@@ -187,17 +196,21 @@ export default function MapView({
   }, [capsules, latitude, longitude, onCapsuleClick, showHeatmap])
 
   return (
-    <div ref={mapContainer} className="absolute inset-0 w-full h-full">
+    <div ref={mapContainer} className="absolute inset-0 w-full h-full" role="application" aria-label="Interactive map">
       {/* Heatmap Toggle Button */}
       <div className="absolute top-20 right-3 z-[1000]">
-        <button
+        <Button
+          variant="icon"
+          size="icon-md"
           onClick={() => setShowHeatmap(!showHeatmap)}
-          className={`btn hud px-3 py-2 flex items-center gap-2 ${
+          className={`hud flex items-center gap-2 min-h-[44px] ${
             showHeatmap 
               ? 'border-signal/30 bg-signal/5 text-signal' 
               : 'border-border text-slate-400 hover:text-slate-200'
           }`}
           title={showHeatmap ? "关闭热力图" : "开启热力图"}
+          aria-label={showHeatmap ? "Disable heatmap" : "Enable heatmap"}
+          aria-pressed={showHeatmap}
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
@@ -205,7 +218,7 @@ export default function MapView({
           <span className="text-xs font-mono tracking-wider">
             {showHeatmap ? 'HEAT ON' : 'HEAT OFF'}
           </span>
-        </button>
+        </Button>
       </div>
     </div>
   )

@@ -1,7 +1,9 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { collectionsApi } from '../lib/api'
+import { useOnline } from '../hooks/useOnline'
 import type { CapsuleCollection, Capsule } from '../types'
+import { Card, Badge, LoadingState, ErrorState, PageShell } from '../components/ui'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 
@@ -12,6 +14,7 @@ interface CollectionWithCapsules extends CapsuleCollection {
 export default function CollectionDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { isOnline } = useOnline()
   const [collection, setCollection] = useState<CollectionWithCapsules | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -105,47 +108,28 @@ export default function CollectionDetailPage() {
   }, [collection, navigate])
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-signal border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-slate-400">正在加载合集...</p>
-        </div>
-      </div>
-    )
+    return <LoadingState message="正在加载合集..." fullscreen />
   }
 
   if (error || !collection) {
     return (
-      <div className="min-h-screen bg-bg flex flex-col items-center justify-center px-6">
-        <div className="label mb-3 text-data-bad">加载失败</div>
-        <p className="data text-center mb-1">{error || '合集不存在'}</p>
-        <button 
-          onClick={() => navigate(-1)} 
-          className="btn mt-4 px-5 py-2 border border-surface-light text-slate-400 text-xs font-mono tracking-wider"
-        >
-          返回
-        </button>
-      </div>
+      <ErrorState
+        title="加载失败"
+        message={error || '合集不存在'}
+        retry={() => navigate(-1)}
+        className="min-h-screen"
+      />
     )
   }
 
   return (
-    <div className="min-h-screen bg-bg">
-      {/* Header */}
-      <header className="sticky top-0 z-30 hud px-4 py-3 flex items-center justify-between">
-        <button 
-          onClick={() => navigate(-1)} 
-          className="btn flex items-center gap-2 text-slate-400 hover:text-signal transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-          <span className="text-xs font-mono tracking-wider">返回</span>
-        </button>
-        <span className="label">合集详情</span>
-        <div className="w-16"></div>
-      </header>
+    <PageShell title="合集详情" backTo={-1}>
+      {/* Offline banner */}
+      {!isOnline && (
+        <Card variant="hud" padding="sm" className="mx-4 mt-2 mb-2 border-data-bad/20 flex items-center gap-2">
+          <Badge variant="error" dot>OFFLINE — DISPLAYING CACHED DATA</Badge>
+        </Card>
+      )}
 
       <div className="pb-28">
         {/* Collection Info */}
@@ -175,10 +159,11 @@ export default function CollectionDetailPage() {
           </div>
           <div className="space-y-3">
             {collection.capsules.map((capsule, index) => (
-              <div 
+              <Card
                 key={capsule.id}
+                variant="default"
+                interactive
                 onClick={() => navigate(`/capsule/${capsule.id}`)}
-                className="panel p-4 cursor-pointer hover:border-signal/30 transition-colors"
               >
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 border border-capsule/30 flex items-center justify-center bg-capsule/5 text-capsule font-mono text-sm flex-shrink-0 mt-0.5">
@@ -211,12 +196,12 @@ export default function CollectionDetailPage() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </div>
       </div>
-    </div>
+    </PageShell>
   )
 }
 

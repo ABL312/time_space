@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
 
+// iOS 13+ extends DeviceOrientationEvent with a permission request method
+interface DeviceOrientationEventWithPermission extends DeviceOrientationEvent {
+  requestPermission?: () => Promise<string>
+}
+
 interface OrientationState {
   alpha: number | null  // Compass heading (0-360)
   beta: number | null   // Front-back tilt (-180 to 180)
@@ -9,12 +14,15 @@ interface OrientationState {
 }
 
 export function useOrientation() {
-  const [state, setState] = useState<OrientationState>({
-    alpha: null,
-    beta: null,
-    gamma: null,
-    error: null,
-    isSupported: typeof DeviceOrientationEvent !== 'undefined',
+  const [state, setState] = useState<OrientationState>(() => {
+    const isSupported = typeof DeviceOrientationEvent !== 'undefined'
+    return {
+      alpha: null,
+      beta: null,
+      gamma: null,
+      error: isSupported ? null : '设备不支持方向感应',
+      isSupported,
+    }
   })
 
   const handleOrientation = useCallback((event: DeviceOrientationEvent) => {
@@ -29,17 +37,13 @@ export function useOrientation() {
 
   useEffect(() => {
     if (!state.isSupported) {
-      setState((prev) => ({
-        ...prev,
-        error: '设备不支持方向感应',
-      }))
       return
     }
 
     // iOS 13+ requires permission request
     const requestPermission = async () => {
       try {
-        const DOE = DeviceOrientationEvent as any
+        const DOE = DeviceOrientationEvent as unknown as { requestPermission?: () => Promise<string> }
         if (typeof DOE.requestPermission === 'function') {
           const permission = await DOE.requestPermission()
           if (permission !== 'granted') {
@@ -69,7 +73,7 @@ export function useOrientation() {
   /** Request iOS permission explicitly (call on user gesture) */
   const requestPermission = useCallback(async () => {
     try {
-      const DOE = DeviceOrientationEvent as any
+      const DOE = DeviceOrientationEvent as unknown as DeviceOrientationEventWithPermission
       if (typeof DOE.requestPermission === 'function') {
         const permission = await DOE.requestPermission()
         if (permission === 'granted') {

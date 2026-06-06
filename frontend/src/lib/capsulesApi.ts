@@ -1,5 +1,5 @@
 import { request, upload, buildQuery } from './client'
-import type { Capsule, NearbyResponse } from '../types'
+import type { Capsule, NearbyResponse, CapsuleResponse, FavoriteCapsule } from '../types'
 
 /** Capsules API - CRUD, nearby, search */
 export const capsulesApi = {
@@ -34,12 +34,12 @@ export const capsulesApi = {
   },
 
   /** Search capsules by text, tag, location */
-  search(params: { q?: string; tag?: string; lat?: number; lng?: number; radius?: number }): Promise<Capsule[]> {
+  search(params: { q?: string; tag?: string; lat?: number; lng?: number; radius?: number }): Promise<{ capsules: Capsule[]; total: number }> {
     return request(`/capsules/search${buildQuery(params)}`)
   },
 
   /** Get daily recommendation */
-  getDailyRecommend(): Promise<Capsule> {
+  getDailyRecommend(): Promise<{ capsule: Capsule; reason: string; expires_at: string }> {
     return request('/capsules/daily-recommend')
   },
 
@@ -52,11 +52,16 @@ export const capsulesApi = {
   regenerateShare(capsuleId: string): Promise<{ share_token: string }> {
     return request(`/capsules/${capsuleId}/regenerate-share`, { method: 'POST' })
   },
+
+  /** Get recent capsules for danmaku display */
+  getRecent(limit: number = 20): Promise<Capsule[]> {
+    return request(`/capsules/recent${buildQuery({ limit })}`)
+  },
 }
 
 /** Responses API - capsule replies */
 export const responsesApi = {
-  list(capsuleId: string): Promise<any[]> {
+  list(capsuleId: string): Promise<CapsuleResponse[]> {
     return request(`/capsules/${capsuleId}/responses`)
   },
 
@@ -65,7 +70,7 @@ export const responsesApi = {
     content: string,
     userId?: string,
     nickname?: string
-  ): Promise<any> {
+  ): Promise<CapsuleResponse> {
     return request(`/capsules/${capsuleId}/responses`, {
       method: 'POST',
       body: JSON.stringify({
@@ -87,11 +92,18 @@ export const favoritesApi = {
     return request(`/favorites/${capsuleId}${buildQuery({ user_id: userId })}`, { method: 'DELETE' })
   },
 
-  list(userId: string): Promise<any[]> {
-    return request(`/favorites${buildQuery({ user_id: userId })}`)
+  async list(userId: string): Promise<FavoriteCapsule[]> {
+    const capsules = await request<Capsule[]>(`/favorites${buildQuery({ user_id: userId })}`)
+    return capsules.map(c => ({
+      id: c.id,
+      user_id: userId,
+      capsule_id: c.id,
+      created_at: c.created_at,
+      capsule: c,
+    }))
   },
 
   status(capsuleId: string, userId: string): Promise<{ is_favorite: boolean }> {
-    return request(`/capsules/${capsuleId}/favorite-status${buildQuery({ user_id: userId })}`)
+    return request(`/favorites/capsules/${capsuleId}/favorite-status${buildQuery({ user_id: userId })}`)
   },
 }

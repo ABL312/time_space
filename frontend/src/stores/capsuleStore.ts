@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { capsulesApi } from '../lib/capsulesApi'
 import type { Capsule, NearbyResponse, LocationContext } from '../types'
 
 interface CapsuleState {
@@ -43,19 +44,8 @@ export const useCapsuleStore = create<CapsuleState>((set) => ({
   fetchNearby: async (params) => {
     set({ isLoadingNearby: true })
     try {
-      const searchParams = new URLSearchParams()
-      searchParams.set('lat', String(params.lat))
-      searchParams.set('lng', String(params.lng))
-      if (params.radius) searchParams.set('radius', String(params.radius))
-      if (params.user_id) searchParams.set('user_id', params.user_id)
-
-      const res = await fetch(`/api/capsules/nearby?${searchParams.toString()}`)
-      if (res.ok) {
-        const data = await res.json()
-        set({ nearby: data, isLoadingNearby: false })
-      } else {
-        set({ isLoadingNearby: false })
-      }
+      const data = await capsulesApi.getNearby(params)
+      set({ nearby: data, isLoadingNearby: false })
     } catch (err) {
       console.error('Failed to fetch nearby capsules:', err)
       set({ isLoadingNearby: false })
@@ -65,15 +55,8 @@ export const useCapsuleStore = create<CapsuleState>((set) => ({
   fetchCapsule: async (id) => {
     set({ isLoadingDetail: true })
     try {
-      const res = await fetch(`/api/capsules/${id}`)
-      if (res.ok) {
-        const capsule = await res.json()
-        set({ selectedCapsule: capsule, isLoadingDetail: false })
-      } else {
-        const error = await res.json().catch(() => ({ detail: res.statusText }))
-        set({ isLoadingDetail: false })
-        throw new Error(error.detail || `HTTP ${res.status}`)
-      }
+      const capsule = await capsulesApi.getById(id)
+      set({ selectedCapsule: capsule, isLoadingDetail: false })
     } catch (err) {
       console.error('Failed to fetch capsule:', err)
       set({ isLoadingDetail: false })

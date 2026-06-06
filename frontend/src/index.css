@@ -60,6 +60,16 @@
   --shadow-signal: 0 0 12px rgba(34, 211, 238, 0.15);
   --shadow-capsule: 0 0 12px rgba(245, 166, 35, 0.12);
 
+  /* ── SPACING: Consistent spacing scale ── */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --space-3xl: 48px;
+  --space-4xl: 64px;
+
   /* ── MOTION: Duration and easing ── */
   --duration-instant: 100ms;
   --duration-fast: 150ms;
@@ -100,28 +110,8 @@ body::after {
 }
 
 /* ==========================================
-   CORE SYSTEM: Panel styles
+   CORE SYSTEM: Overlay & utility styles
    ========================================== */
-
-/* Primary panel - thin border, subtle glow */
-.panel {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  position: relative;
-}
-
-.panel::before {
-  content: '';
-  position: absolute;
-  inset: -1px;
-  pointer-events: none;
-  background: linear-gradient(
-    135deg,
-    rgba(34, 211, 238, 0.05) 0%,
-    transparent 50%,
-    rgba(245, 166, 35, 0.03) 100%
-  );
-}
 
 /* Glass panel - for overlays on map/camera */
 .hud {
@@ -167,19 +157,6 @@ body::after {
     transform: scale(2.5);
     opacity: 0;
   }
-}
-
-.signal-marker {
-  position: relative;
-}
-
-.signal-marker::before {
-  content: '';
-  position: absolute;
-  inset: -4px;
-  border: 1px solid var(--color-capsule);
-  border-radius: 50%;
-  animation: signal-ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
 /* Breathing glow */
@@ -270,29 +247,8 @@ body::after {
 }
 
 /* ==========================================
-   INTERACTION: Button & press states
+   INTERACTION: Press states
    ========================================== */
-.btn {
-  transition: all 0.15s ease;
-  position: relative;
-}
-
-.btn::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  opacity: 0;
-  transition: opacity 0.15s ease;
-  background: linear-gradient(135deg, rgba(34, 211, 238, 0.1), transparent);
-}
-
-.btn:hover::after {
-  opacity: 1;
-}
-
-.btn:active {
-  transform: scale(0.97);
-}
 
 /* Interactive row */
 .row-hover {
@@ -569,4 +525,71 @@ body::after {
 [data-theme="night"] {
   --bg-primary: #020617;
   --accent: #818cf8;
+}
+
+/* ==========================================
+   ACCESSIBILITY: Focus ring, touch targets, motion
+   ========================================== */
+
+/* Global focus-visible ring for all interactive elements */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible,
+[role="button"]:focus-visible {
+  outline: 2px solid var(--color-signal);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* Minimum touch target: 44x44px per WCAG 2.5.8 */
+@media (pointer: coarse) {
+  button,
+  a,
+  [role="button"],
+  input[type="checkbox"],
+  input[type="radio"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* Respect prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .breathe,
+  .wave-bar,
+  .skeleton,
+  .signal-marker::before {
+    animation: none !important;
+  }
+}
+
+/* Skip-to-content link (visible on focus) */
+.skip-link {
+  position: fixed;
+  top: -100%;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  padding: 0.75rem 1.5rem;
+  background: var(--color-signal);
+  color: var(--color-void);
+  font-weight: 600;
+  font-size: 0.875rem;
+  border-radius: var(--radius-md);
+  transition: top 0.15s ease;
+}
+
+.skip-link:focus {
+  top: 1rem;
 }

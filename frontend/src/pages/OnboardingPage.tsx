@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUserStore } from '../stores/userStore'
-import { usersApi } from '../lib/api'
+import { usersApi, getErrorMessage } from '../lib/api'
 import { INTEREST_TAGS } from '../types'
 import Starfield from '../components/Starfield'
 
@@ -38,8 +38,8 @@ export default function OnboardingPage() {
       })
       setUser(user)
       navigate('/')
-    } catch (err: any) {
-      setError(err.message || '注册失败，请重试')
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, '注册失败，请重试'))
     } finally {
       setIsSubmitting(false)
     }
@@ -86,7 +86,7 @@ export default function OnboardingPage() {
                 <button
                   key={tag.key}
                   onClick={() => toggleTag(tag.label)}
-                  className={`btn p-3 text-sm text-left transition-all border ${
+                  className={`p-3 text-sm text-left transition-all border rounded-[var(--radius-md)] ${
                     isSelected
                       ? 'border-signal/40 bg-signal/5 text-white'
                       : 'border-border bg-surface/50 text-slate-400 hover:border-surface-light'
@@ -107,7 +107,7 @@ export default function OnboardingPage() {
         <button
           onClick={handleSubmit}
           disabled={!canSubmit || isSubmitting}
-          className={`btn w-full py-3.5 text-xs font-mono tracking-widest transition-all border ${
+          className={`w-full py-3.5 text-xs font-mono tracking-widest transition-all border rounded-[var(--radius-md)] ${
             canSubmit && !isSubmitting
               ? 'border-capsule/40 bg-capsule/5 text-capsule hover:bg-capsule/10'
               : 'border-border bg-surface/50 text-slate-600 cursor-not-allowed'

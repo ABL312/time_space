@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { favoritesApi } from '../lib/api'
+import { favoritesApi, getErrorMessage } from '../lib/api'
 import { useUserStore } from '../stores/userStore'
 import type { FavoriteCapsule } from '../types'
 import { PageShell, Card, Badge, LoadingState, EmptyState, ErrorState } from '../components/ui'
@@ -21,8 +21,8 @@ export default function FavoritesPage() {
         setError(null)
         const data = await favoritesApi.list(user.id)
         setFavorites(data)
-      } catch (err: any) {
-        setError(err.message || '获取收藏失败')
+      } catch (err: unknown) {
+        setError(getErrorMessage(err, '获取收藏失败'))
       } finally {
         setIsLoading(false)
       }
@@ -90,7 +90,7 @@ export default function FavoritesPage() {
                 <Card
                   key={fav.id}
                   variant="default"
-                  className="cursor-pointer hover:border-signal/30 transition-colors"
+                  interactive
                   onClick={() => navigate(`/capsule/${c.id}`)}
                 >
                   <div className="flex items-start gap-3">

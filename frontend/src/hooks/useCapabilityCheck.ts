@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { request as apiRequest } from '../lib/client'
 
 export interface DeviceCapabilities {
   /** Camera (getUserMedia) available */
@@ -147,17 +148,17 @@ export function useCapabilityCheck(options: CapabilityCheckOptions = {}): Device
 
 /**
  * Hook for API request with timeout and retry (#19).
- * Returns a wrapped fetch function that handles timeouts and retries.
+ * Uses the unified client.ts request() with retry logic.
  */
 export function useAPIWithRetry() {
   const [isRetrying, setIsRetrying] = useState(false)
   const [lastError, setLastError] = useState<string | null>(null)
 
   const fetchWithRetry = useCallback(
-    async (
+    async <T = unknown>(
       url: string,
       options?: RequestInit & { timeout?: number; maxRetries?: number }
-    ): Promise<Response> => {
+    ): Promise<T> => {
       const timeout = options?.timeout ?? 10000
       const maxRetries = options?.maxRetries ?? 2
       let lastErr: Error | null = null
@@ -165,35 +166,17 @@ export function useAPIWithRetry() {
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         if (attempt > 0) {
           setIsRetrying(true)
-          // Wait before retry with exponential backoff
           await new Promise((r) => setTimeout(r, 1000 * attempt))
         }
 
         try {
-          const controller = new AbortController()
-          const timer = setTimeout(() => controller.abort(), timeout)
-
-          const res = await fetch(url, {
-            ...options,
-            signal: controller.signal,
-          })
-
-          clearTimeout(timer)
+          const result = await apiRequest<T>(url, options, timeout)
           setIsRetrying(false)
           setLastError(null)
-
-          if (!res.ok) {
-            throw new Error(`HTTP ${res.status}: ${res.statusText}`)
-          }
-
-          return res
+          return result
         } catch (err) {
           lastErr = err instanceof Error ? err : new Error(String(err))
-          if (lastErr.name === 'AbortError') {
-            setLastError('请求超时，请检查网络连接')
-          } else {
-            setLastError(lastErr.message)
-          }
+          setLastError(lastErr.message)
         }
       }
 

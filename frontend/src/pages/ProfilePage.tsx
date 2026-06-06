@@ -21,7 +21,7 @@ function CapsuleRow({ capsule, onClick }: { capsule: Capsule; onClick: () => voi
   return (
     <Card
       variant="default"
-      className="cursor-pointer hover:border-signal/30 transition-colors"
+      interactive
       onClick={onClick}
     >
       <div className="flex items-start gap-3">

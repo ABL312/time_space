@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 
 export interface Achievement {
   id: string;
@@ -56,44 +56,32 @@ const ACHIEVEMENTS: Omit<Achievement, 'unlocked' | 'unlockTime' | 'progress'>[] 
   },
 ];
 
+function loadAchievements(): Achievement[] {
+  try {
+    const saved = localStorage.getItem('achievements');
+    if (saved) return JSON.parse(saved);
+  } catch { /* ignore */ }
+  return ACHIEVEMENTS.map(ach => ({ ...ach, unlocked: false, progress: 0 }));
+}
+
+function loadCount(key: string): number {
+  try {
+    const saved = localStorage.getItem(key);
+    if (saved) return parseInt(saved, 10);
+  } catch { /* ignore */ }
+  return 0;
+}
+
 export const useAchievements = () => {
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
-  const [capsuleOpenCount, setCapsuleOpenCount] = useState(0);
-  const [capsuleCreateCount, setCapsuleCreateCount] = useState(0);
+  const [achievements, setAchievements] = useState<Achievement[]>(loadAchievements);
+  const [capsuleOpenCount, setCapsuleOpenCount] = useState(() => loadCount('capsuleOpenCount'));
+  const [capsuleCreateCount, setCapsuleCreateCount] = useState(() => loadCount('capsuleCreateCount'));
+  const prevAchievementsRef = useRef(achievements);
 
-  // 初始化成就数据
-  useEffect(() => {
-    const savedAchievements = localStorage.getItem('achievements');
-    const savedOpenCount = localStorage.getItem('capsuleOpenCount');
-    const savedCreateCount = localStorage.getItem('capsuleCreateCount');
-
-    if (savedAchievements) {
-      setAchievements(JSON.parse(savedAchievements));
-    } else {
-      // 初始化成就
-      const initialAchievements = ACHIEVEMENTS.map(ach => ({
-        ...ach,
-        unlocked: false,
-        progress: 0,
-      }));
-      setAchievements(initialAchievements);
-      localStorage.setItem('achievements', JSON.stringify(initialAchievements));
-    }
-
-    if (savedOpenCount) {
-      setCapsuleOpenCount(parseInt(savedOpenCount, 10));
-    }
-
-    if (savedCreateCount) {
-      setCapsuleCreateCount(parseInt(savedCreateCount, 10));
-    }
-  }, []);
-
-  // 更新成就状态
-  useEffect(() => {
-    const updatedAchievements = achievements.map(achievement => {
+  // 计算派生成就状态
+  const computedAchievements = useMemo(() => {
+    return achievements.map(achievement => {
       let progress = achievement.progress;
-      let unlocked = achievement.unlocked;
 
       if (achievement.id.includes('exploration') || achievement.id.includes('curious')) {
         progress = Math.min(capsuleOpenCount, achievement.target);
@@ -101,29 +89,26 @@ export const useAchievements = () => {
         progress = Math.min(capsuleCreateCount, achievement.target);
       }
 
-      if (progress >= achievement.target && !unlocked) {
-        unlocked = true;
-        return {
-          ...achievement,
-          progress,
-          unlocked,
-          unlockTime: Date.now(),
-        };
+      if (progress >= achievement.target && !achievement.unlocked) {
+        return { ...achievement, progress, unlocked: true, unlockTime: achievement.unlockTime ?? 0 };
       }
 
-      return {
-        ...achievement,
-        progress,
-      };
+      return { ...achievement, progress };
     });
+  }, [achievements, capsuleOpenCount, capsuleCreateCount]);
 
-    // 检查是否有更新
-    const hasChanges = JSON.stringify(updatedAchievements) !== JSON.stringify(achievements);
-    if (hasChanges) {
-      setAchievements(updatedAchievements);
-      localStorage.setItem('achievements', JSON.stringify(updatedAchievements));
+  // 持久化成就变化
+  useEffect(() => {
+    if (prevAchievementsRef.current !== computedAchievements) {
+      // Stamp real unlock timestamps for newly unlocked achievements
+      const stamped = computedAchievements.map(a =>
+        a.unlocked && a.unlockTime === 0 ? { ...a, unlockTime: Date.now() } : a
+      );
+      prevAchievementsRef.current = stamped;
+      setAchievements(stamped);
+      localStorage.setItem('achievements', JSON.stringify(stamped));
     }
-  }, [capsuleOpenCount, capsuleCreateCount, achievements]);
+  }, [computedAchievements]);
 
   // 记录打开胶囊
   const recordCapsuleOpened = () => {

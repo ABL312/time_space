@@ -1,11 +1,14 @@
 import { useEffect, useState, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { shareApi } from '../lib/api'
+import { useOnline } from '../hooks/useOnline'
+import { PageShell, Card, Badge, LoadingState, ErrorState } from '../components/ui'
 import type { Capsule } from '../types'
 
 export default function SharedCapsulePage() {
   const { token } = useParams<{ token: string }>()
   const navigate = useNavigate()
+  const { isOnline } = useOnline()
   const [capsule, setCapsule] = useState<Capsule | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -25,50 +28,30 @@ export default function SharedCapsulePage() {
   }, [token])
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-bg flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-8 h-8 border-2 border-signal border-t-transparent rounded-full animate-spin mx-auto mb-3"></div>
-          <p className="text-slate-400">正在解码胶囊...</p>
-        </div>
-      </div>
-    )
+    return <LoadingState message="正在解码胶囊..." fullscreen />
   }
 
   if (error || !capsule) {
     return (
-      <div className="min-h-screen bg-bg flex flex-col items-center justify-center px-6">
-        <div className="label mb-3 text-data-bad">SIGNAL LOST</div>
-        <p className="data text-center mb-1">{error || '胶囊不存在'}</p>
-        <p className="data text-slate-600 mb-6">链接可能已失效或胶囊已被删除</p>
-        <button 
-          onClick={() => navigate('/')} 
-          className="btn px-5 py-2 border border-surface-light text-slate-400 text-xs font-mono tracking-wider"
-        >
-          RETURN TO MAP
-        </button>
-      </div>
+      <ErrorState
+        title="SIGNAL LOST"
+        message={error || '胶囊不存在'}
+        retry={() => navigate('/')}
+        className="min-h-screen"
+      />
     )
   }
 
   const photos = capsule.media?.filter((m) => m.type === 'photo') ?? []
 
   return (
-    <div className="min-h-screen bg-bg page-in">
-      {/* NAV BAR */}
-      <header className="sticky top-0 z-30 hud px-4 py-3 flex items-center justify-between">
-        <button 
-          onClick={() => navigate('/')} 
-          className="btn flex items-center gap-2 text-slate-400 hover:text-signal transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-          <span className="text-xs font-mono tracking-wider">RETURN</span>
-        </button>
-        <span className="label">SHARED CAPSULE</span>
-        <div className="w-8"></div>
-      </header>
+    <PageShell title="SHARED CAPSULE" backTo="/">
+      {/* Offline banner */}
+      {!isOnline && (
+        <Card variant="hud" padding="sm" className="mx-4 mt-2 mb-2 border-data-bad/20 flex items-center gap-2">
+          <Badge variant="error" dot>OFFLINE — DISPLAYING CACHED DATA</Badge>
+        </Card>
+      )}
 
       <div className="max-w-lg mx-auto px-4 py-6 pb-28 stagger">
         {/* ── AUTHOR BLOCK ── */}
@@ -106,7 +89,7 @@ export default function SharedCapsulePage() {
             <span className="inline-block w-2 h-px bg-signal-dim" />
             MESSAGE_CONTENT
           </div>
-          <div className="panel corners p-5">
+          <div className="corners p-5 rounded-[var(--radius-md)] border border-border bg-surface">
             <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-slate-200">
               {capsule.message}
             </p>
@@ -195,7 +178,7 @@ export default function SharedCapsulePage() {
             <span className="inline-block w-2 h-px bg-signal-dim" />
             LOCATION_DATA
           </div>
-          <div className="panel p-3">
+          <div className="p-3 rounded-[var(--radius-md)] border border-border bg-surface">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-white">
@@ -209,7 +192,7 @@ export default function SharedCapsulePage() {
           </div>
         </section>
       </div>
-    </div>
+    </PageShell>
   )
 }
 
@@ -255,7 +238,11 @@ function VoicePlayer({ src, variant }: { src: string; variant: 'signal' | 'capsu
 
   const toggle = () => {
     if (!audioRef.current) return
-    playing ? audioRef.current.pause() : audioRef.current.play()
+    if (playing) {
+      audioRef.current.pause()
+    } else {
+      audioRef.current.play()
+    }
     setPlaying(!playing)
   }
 
@@ -263,7 +250,7 @@ function VoicePlayer({ src, variant }: { src: string; variant: 'signal' | 'capsu
   const isCapsule = variant === 'capsule'
 
   return (
-    <div className={`panel p-3 ${isCapsule ? 'border-capsule/15' : 'border-signal/15'}`}>
+    <div className={`p-3 rounded-[var(--radius-md)] border bg-surface ${isCapsule ? 'border-capsule/15' : 'border-signal/15'}`}>
       <audio
         ref={audioRef}
         src={src}
@@ -275,7 +262,7 @@ function VoicePlayer({ src, variant }: { src: string; variant: 'signal' | 'capsu
       <div className="flex items-center gap-3">
         <button
           onClick={toggle}
-          className={`btn w-9 h-9 flex items-center justify-center flex-shrink-0 ${
+          className={`w-9 h-9 flex items-center justify-center flex-shrink-0 rounded-[var(--radius-sm)] ${
             isCapsule
               ? 'border border-capsule/25 bg-capsule/5 text-capsule'
               : 'border border-signal/25 bg-signal/5 text-signal'

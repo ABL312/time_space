@@ -35,15 +35,19 @@ export default function RecommendPanel() {
   return (
     <div
       ref={panelRef}
-      className={`absolute bottom-0 left-0 right-0 z-20 transition-all duration-400 ease-out ${
+      className={`absolute bottom-0 left-0 right-0 z-[1000] transition-all duration-400 ease-out ${
         expanded ? 'max-h-[72vh]' : 'max-h-20'
       }`}
+      role="region"
+      aria-label="Nearby capsules"
     >
       <div className="hud overflow-hidden">
         {/* HEADER BAR */}
         <button
           onClick={() => setExpanded(!expanded)}
-          className="w-full px-4 py-3 flex items-center justify-between row-hover"
+          className="w-full px-4 py-3 flex items-center justify-between row-hover min-h-[44px]"
+          aria-expanded={expanded}
+          aria-controls="recommend-panel-content"
         >
           {/* Drag handle */}
           <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-surface-light" />
@@ -78,7 +82,7 @@ export default function RecommendPanel() {
 
         {/* EXPANDED CONTENT */}
         {expanded && (
-          <div className="px-4 pb-6 overflow-y-auto max-h-[60vh] stagger">
+          <div id="recommend-panel-content" className="px-4 pb-6 overflow-y-auto max-h-[60vh] stagger" role="list">
             {/* Location context */}
             {nearby?.location_context && (
               <div className="mb-3 p-2.5 border border-border bg-surface/50">
@@ -168,7 +172,7 @@ function CapsuleRow({ capsule, rank, thumb, onClick }: {
   const score = capsule.match_score != null ? Math.round(capsule.match_score) : null
 
   return (
-    <button onClick={onClick} className="w-full text-left panel row-hover flex overflow-hidden">
+    <button onClick={onClick} className="w-full text-left row-hover flex overflow-hidden rounded-[var(--radius-md)] border border-border bg-surface hover:border-border-active transition-colors">
       {/* Thumbnail / Rank */}
       <div className="relative w-16 h-16 flex-shrink-0 bg-surface-light/30 flex items-center justify-center border-r border-border">
         {thumb ? (
