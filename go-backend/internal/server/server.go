@@ -38,8 +38,9 @@ func (s *Server) Start() error {
 	fs := http.FileServer(http.Dir(s.config.UploadDir))
 	mux.Handle("/uploads/", http.StripPrefix("/uploads/", fs))
 
-	// Apply middleware
+	// Apply middleware (outermost first)
 	var handler http.Handler = mux
+	handler = handlers.LoggingMiddleware(handler)
 	handler = handlers.CORSMiddleware(s.config.CORSOrigins)(handler)
 	handler = handlers.TimeoutMiddleware(30 * time.Second)(handler)
 
