@@ -60,8 +60,12 @@ func CreateCapsule(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		if req.Message == "" || req.Latitude == 0 && req.Longitude == 0 {
-			WriteError(w, http.StatusBadRequest, "message, latitude, and longitude are required")
+		if req.Message == "" || len(req.Message) < 10 || len(req.Message) > 500 {
+			WriteError(w, http.StatusBadRequest, "message is required (10-500 chars)")
+			return
+		}
+		if req.Latitude == 0 && req.Longitude == 0 {
+			WriteError(w, http.StatusBadRequest, "latitude and longitude are required")
 			return
 		}
 		if req.Visibility == "" {
@@ -191,7 +195,7 @@ func GetCapsuleByShareToken(db *sql.DB) http.HandlerFunc {
 
 // ── List capsules ───────────────────────────────────────────────
 
-// GetMyCapsules handles GET /api/capsules/mine?user_id=xxx
+// GetMyCapsules handles GET /api/capsules/mine?user_id=xxx&limit=50&offset=0
 func GetMyCapsules(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := r.URL.Query().Get("user_id")
@@ -200,10 +204,15 @@ func GetMyCapsules(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		capsules := queryCapsulesByAuthor(db, userID, 50)
+		limit, offset := parsePagination(r, 50, 100)
+
+		capsules := queryCapsulesByAuthor(db, userID, limit, offset)
+		// Count total
+		var total int
+		db.QueryRow("SELECT COUNT(*) FROM capsules WHERE author_id = ?", userID).Scan(&total)
 		resp := models.MineResponse{
 			Capsules: capsules,
-			Total:    len(capsules),
+			Total:    total,
 		}
 		WriteJSON(w, http.StatusOK, resp)
 	}
@@ -339,6 +348,12 @@ func GetNearby(db *sql.DB) http.HandlerFunc {
 				others = append(others, c)
 			}
 		}
+		if recommended == nil {
+			recommended = []models.CapsuleResponse{}
+		}
+		if others == nil {
+			others = []models.CapsuleResponse{}
+		}
 
 		// Ensure total doesn't exceed limit
 		if len(recommended)+len(others) > limit {
@@ -346,6 +361,22 @@ func GetNearby(db *sql.DB) http.HandlerFunc {
 			if remaining > 0 && remaining < len(others) {
 				others = others[:remaining]
 			}
+		}
+
+		// Batch load media + interaction counts (N+1 prevention)
+		allCapsules := append(recommended, others...)
+		capsuleIDs := make([]string, len(allCapsules))
+		for i, c := range allCapsules {
+			capsuleIDs[i] = c.ID
+		}
+		mediaMap := batchQueryMedia(db, capsuleIDs)
+		interactionMap := batchQueryInteractionCounts(db, capsuleIDs)
+		for i := range recommended {
+			recommended[i].Media = mediaMap[recommended[i].ID]
+			_ = interactionMap // reserved for future response fields
+		}
+		for i := range others {
+			others[i].Media = mediaMap[others[i].ID]
 		}
 
 		resp := models.NearbyResponse{
@@ -367,6 +398,8 @@ func SearchCapsules(db *sql.DB) http.HandlerFunc {
 		lngStr := q.Get("lng")
 		radiusStr := q.Get("radius")
 		userID := q.Get("user_id")
+
+		limit, offset := parsePagination(r, 100, 200)
 
 		radius := 5000
 		if radiusStr != "" {
@@ -410,7 +443,8 @@ func SearchCapsules(db *sql.DB) http.HandlerFunc {
 		currentTime := time.Now().UTC().Format(time.RFC3339)
 		baseQuery += " AND (c.unlock_at IS NULL OR c.unlock_at <= ?)"
 		args = append(args, currentTime)
-		baseQuery += " ORDER BY c.created_at DESC LIMIT 100"
+		baseQuery += " ORDER BY c.created_at DESC LIMIT ? OFFSET ?"
+		args = append(args, limit, offset)
 
 		rows, err := db.Query(baseQuery, args...)
 		if err != nil {
@@ -436,6 +470,9 @@ func SearchCapsules(db *sql.DB) http.HandlerFunc {
 			}
 
 			capsules = append(capsules, *capsule)
+		}
+		if capsules == nil {
+			capsules = []models.CapsuleResponse{}
 		}
 
 		// Batch fetch media for N+1 prevention
@@ -594,8 +631,8 @@ func ReplyToCapsule(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		if req.Message == "" {
-			WriteError(w, http.StatusBadRequest, "message is required")
+		if req.Message == "" || len(req.Message) < 10 || len(req.Message) > 500 {
+			WriteError(w, http.StatusBadRequest, "message is required (10-500 chars)")
 			return
 		}
 
@@ -679,13 +716,13 @@ func queryCapsuleByShareToken(db *sql.DB, token string) *models.CapsuleResponse 
 	return c
 }
 
-func queryCapsulesByAuthor(db *sql.DB, authorID string, limit int) []models.CapsuleResponse {
+func queryCapsulesByAuthor(db *sql.DB, authorID string, limit, offset int) []models.CapsuleResponse {
 	rows, err := db.Query(
 		`SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
 		 FROM capsules c LEFT JOIN users u ON c.author_id = u.id
 		 WHERE c.author_id = ?
-		 ORDER BY c.created_at DESC LIMIT ?`,
-		authorID, limit,
+		 ORDER BY c.created_at DESC LIMIT ? OFFSET ?`,
+		authorID, limit, offset,
 	)
 	if err != nil {
 		return nil
@@ -699,6 +736,9 @@ func queryCapsulesByAuthor(db *sql.DB, authorID string, limit int) []models.Caps
 			capsules = append(capsules, *c)
 			capsuleIDs = append(capsuleIDs, c.ID)
 		}
+	}
+	if capsules == nil {
+		capsules = []models.CapsuleResponse{}
 	}
 
 	// Batch load media (N+1 prevention)
@@ -766,6 +806,39 @@ func batchQueryMedia(db *sql.DB, capsuleIDs []string) map[string][]models.MediaR
 			m.ThumbnailURL = &thumbnailURL.String
 		}
 		result[m.CapsuleID] = append(result[m.CapsuleID], m)
+	}
+	return result
+}
+
+// batchQueryInteractionCounts loads interaction counts for multiple capsules in one query (N+1 prevention)
+func batchQueryInteractionCounts(db *sql.DB, capsuleIDs []string) map[string]int {
+	if len(capsuleIDs) == 0 {
+		return map[string]int{}
+	}
+
+	placeholders := make([]string, len(capsuleIDs))
+	args := make([]interface{}, len(capsuleIDs))
+	for i, id := range capsuleIDs {
+		placeholders[i] = "?"
+		args[i] = id
+	}
+
+	rows, err := db.Query(
+		"SELECT capsule_id, COUNT(*) FROM interactions WHERE capsule_id IN ("+
+			strings.Join(placeholders, ",")+") GROUP BY capsule_id",
+		args...,
+	)
+	if err != nil {
+		return map[string]int{}
+	}
+	defer rows.Close()
+
+	result := make(map[string]int)
+	for rows.Next() {
+		var capsuleID string
+		var count int
+		rows.Scan(&capsuleID, &count)
+		result[capsuleID] = count
 	}
 	return result
 }
@@ -897,11 +970,58 @@ func extractCapsuleID(path string) string {
 
 func extractPathParam(path, prefix string) string {
 	s := strings.TrimPrefix(path, prefix)
-	// Remove trailing slashes and sub-paths
 	if idx := strings.Index(s, "/"); idx >= 0 {
 		s = s[:idx]
 	}
 	return s
+}
+
+// parsePagination extracts limit and offset from query params.
+// Supports both limit/offset and page/page_size.
+// Default limit, max limit are configurable.
+func parsePagination(r *http.Request, defaultLimit, maxLimit int) (limit, offset int) {
+	limit = defaultLimit
+	offset = 0
+
+	q := r.URL.Query()
+
+	// Support page/page_size as alternative
+	if pageStr := q.Get("page"); pageStr != "" {
+		page, _ := strconv.Atoi(pageStr)
+		pageSize := defaultLimit
+		if ps := q.Get("page_size"); ps != "" {
+			if v, err := strconv.Atoi(ps); err == nil && v > 0 {
+				pageSize = v
+			}
+		}
+		if page < 1 {
+			page = 1
+		}
+		limit = pageSize
+		offset = (page - 1) * pageSize
+	}
+
+	// limit/offset override page/page_size
+	if l := q.Get("limit"); l != "" {
+		if v, err := strconv.Atoi(l); err == nil && v > 0 {
+			limit = v
+		}
+	}
+	if o := q.Get("offset"); o != "" {
+		if v, err := strconv.Atoi(o); err == nil && v >= 0 {
+			offset = v
+		}
+	}
+
+	// Cap limit
+	if limit > maxLimit {
+		limit = maxLimit
+	}
+	if limit < 1 {
+		limit = 1
+	}
+
+	return
 }
 
 func generateShareToken(length int) string {

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -377,5 +378,144 @@ func TestSearchCapsulesEmpty(t *testing.T) {
 	json.Unmarshal(rr.Body.Bytes(), &resp)
 	if resp.Total != 0 {
 		t.Errorf("expected 0 results, got %d", resp.Total)
+	}
+}
+
+func TestCreateUserValidationTags(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	// Only 2 tags — should fail
+	body := `{"name": "测试", "interest_tags": ["校园", "家庭"]}`
+	req := httptest.NewRequest("POST", "/api/users", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := CreateUser(db)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for invalid tags count, got %d", rr.Code)
+	}
+}
+
+func TestCreateCapsuleValidationMessage(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	// Message too short (< 10 chars)
+	body := `{"message": "短", "latitude": 31.23, "longitude": 121.47}`
+	req := httptest.NewRequest("POST", "/api/capsules", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := CreateCapsule(db)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("expected 400 for short message, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestUserRegisterCompat(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	body := `{"name": "注册用户", "interest_tags": ["标签一", "标签二", "标签三"]}`
+	req := httptest.NewRequest("POST", "/api/users/register", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+
+	handler := CreateUser(db) // same handler as POST /api/users
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Errorf("expected 201 for register, got %d: %s", rr.Code, rr.Body.String())
+	}
+}
+
+func TestPaginationLimitOffset(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	// Create 5 capsules for same author
+	for i := 0; i < 5; i++ {
+		db.Exec(`INSERT INTO capsules (id, author_id, latitude, longitude, geohash, message, visibility)
+			VALUES (?, ?, ?, ?, ?, ?, 'public')`,
+			fmt.Sprintf("cap-%d", i), "user-1", 31.23, 121.47, "wtw3sj", "测试消息内容足够十个字")
+	}
+
+	// Request with limit=2
+	req := httptest.NewRequest("GET", "/api/capsules/mine?user_id=user-1&limit=2&offset=1", nil)
+	rr := httptest.NewRecorder()
+
+	handler := GetMyCapsules(db)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var resp models.MineResponse
+	json.Unmarshal(rr.Body.Bytes(), &resp)
+	if resp.Total != 5 {
+		t.Errorf("expected total=5, got %d", resp.Total)
+	}
+	if len(resp.Capsules) > 2 {
+		t.Errorf("expected at most 2 capsules with limit=2, got %d", len(resp.Capsules))
+	}
+}
+
+func TestPaginationPageSize(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	for i := 0; i < 5; i++ {
+		db.Exec(`INSERT INTO capsules (id, author_id, latitude, longitude, geohash, message, visibility)
+			VALUES (?, ?, ?, ?, ?, ?, 'public')`,
+			fmt.Sprintf("cap-%d", i), "user-1", 31.23, 121.47, "wtw3sj", "测试消息内容足够十个字")
+	}
+
+	// page=1, page_size=2
+	req := httptest.NewRequest("GET", "/api/capsules/mine?user_id=user-1&page=1&page_size=2", nil)
+	rr := httptest.NewRecorder()
+
+	handler := GetMyCapsules(db)
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rr.Code)
+	}
+	var resp models.MineResponse
+	json.Unmarshal(rr.Body.Bytes(), &resp)
+	if len(resp.Capsules) > 2 {
+		t.Errorf("expected at most 2 capsules with page_size=2, got %d", len(resp.Capsules))
+	}
+}
+
+func TestBatchInteractionCounts(t *testing.T) {
+	db := setupTestDB(t)
+	defer db.Close()
+
+	// Create capsules
+	db.Exec("INSERT INTO capsules (id, latitude, longitude, geohash, message, visibility) VALUES ('c1', 31.2, 121.4, 'wtw3sj', '测试消息内容足够十个字', 'public')")
+	db.Exec("INSERT INTO capsules (id, latitude, longitude, geohash, message, visibility) VALUES ('c2', 31.2, 121.4, 'wtw3sj', '测试消息内容足够十个字', 'public')")
+
+	// Add interactions
+	db.Exec("INSERT INTO interactions (id, capsule_id, action) VALUES ('i1', 'c1', 'open')")
+	db.Exec("INSERT INTO interactions (id, capsule_id, action) VALUES ('i2', 'c1', 'open')")
+	db.Exec("INSERT INTO interactions (id, capsule_id, action) VALUES ('i3', 'c2', 'reply')")
+
+	counts := batchQueryInteractionCounts(db, []string{"c1", "c2"})
+	if counts["c1"] != 2 {
+		t.Errorf("expected c1 count=2, got %d", counts["c1"])
+	}
+	if counts["c2"] != 1 {
+		t.Errorf("expected c2 count=1, got %d", counts["c2"])
+	}
+	// Empty IDs should return empty map
+	empty := batchQueryInteractionCounts(db, []string{})
+	if len(empty) != 0 {
+		t.Errorf("expected empty map for empty IDs, got %d entries", len(empty))
 	}
 }

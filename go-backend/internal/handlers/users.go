@@ -23,8 +23,12 @@ func CreateUser(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		if req.Name == "" || len(req.InterestTags) == 0 {
-			WriteError(w, http.StatusBadRequest, "name and interest_tags are required")
+		if req.Name == "" || len(req.Name) > 20 {
+			WriteError(w, http.StatusBadRequest, "name is required (1-20 chars)")
+			return
+		}
+		if len(req.InterestTags) != 3 {
+			WriteError(w, http.StatusBadRequest, "interest_tags must contain exactly 3 tags")
 			return
 		}
 

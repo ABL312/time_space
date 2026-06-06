@@ -36,6 +36,7 @@ func (s *Server) Start() error {
 
 	// Users
 	mux.HandleFunc("POST /api/users", handlers.CreateUser(s.db))
+	mux.HandleFunc("POST /api/users/register", handlers.CreateUser(s.db)) // legacy compat
 	mux.HandleFunc("GET /api/users/{user_id}", handlers.GetUser(s.db))
 	mux.HandleFunc("PUT /api/users/{user_id}", handlers.UpdateUser(s.db))
 	mux.HandleFunc("GET /api/users/{user_id}/stats", handlers.GetUserStats(s.db))
