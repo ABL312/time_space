@@ -1,5 +1,5 @@
 import { request, upload, buildQuery } from './client'
-import type { Capsule, NearbyResponse } from '../types'
+import type { Capsule, NearbyResponse, CapsuleResponse, FavoriteCapsule } from '../types'
 
 /** Capsules API - CRUD, nearby, search */
 export const capsulesApi = {
@@ -56,7 +56,7 @@ export const capsulesApi = {
 
 /** Responses API - capsule replies */
 export const responsesApi = {
-  list(capsuleId: string): Promise<any[]> {
+  list(capsuleId: string): Promise<CapsuleResponse[]> {
     return request(`/capsules/${capsuleId}/responses`)
   },
 
@@ -65,7 +65,7 @@ export const responsesApi = {
     content: string,
     userId?: string,
     nickname?: string
-  ): Promise<any> {
+  ): Promise<CapsuleResponse> {
     return request(`/capsules/${capsuleId}/responses`, {
       method: 'POST',
       body: JSON.stringify({
@@ -87,7 +87,7 @@ export const favoritesApi = {
     return request(`/favorites/${capsuleId}${buildQuery({ user_id: userId })}`, { method: 'DELETE' })
   },
 
-  list(userId: string): Promise<any[]> {
+  list(userId: string): Promise<FavoriteCapsule[]> {
     return request(`/favorites${buildQuery({ user_id: userId })}`)
   },
 

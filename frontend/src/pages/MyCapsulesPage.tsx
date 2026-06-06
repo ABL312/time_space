@@ -13,12 +13,14 @@ export default function MyCapsulesPage() {
 
   useEffect(() => {
     if (!user) return
-    setIsLoading(true)
+    let cancelled = false
+    queueMicrotask(() => { if (!cancelled) setIsLoading(true) })
     capsulesApi
       .getMine(user.id)
-      .then((res) => setCapsules(res.capsules))
-      .catch((err) => setError(err.message))
-      .finally(() => setIsLoading(false))
+      .then((res) => { if (!cancelled) setCapsules(res.capsules) })
+      .catch((err) => { if (!cancelled) setError(err.message) })
+      .finally(() => { if (!cancelled) setIsLoading(false) })
+    return () => { cancelled = true }
   }, [user])
 
   return (

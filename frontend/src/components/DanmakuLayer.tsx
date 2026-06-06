@@ -16,8 +16,6 @@ const DanmakuLayer: React.FC = () => {
 
   // Fetch recent capsules
   useEffect(() => {
-    let intervalId: any;
-
     const fetchRecentCapsules = async () => {
       try {
         const response = await fetch('/api/capsules/recent?limit=20');
@@ -25,33 +23,23 @@ const DanmakuLayer: React.FC = () => {
           const data = await response.json();
           const capsules: Capsule[] = data.capsules || data;
           
-          // Create new danmaku items
           const newDanmakus = capsules
             .filter(capsule => capsule.message)
             .map(capsule => {
-              // Get first 20 characters of message
               const text = capsule.message!.length > 20 
                 ? capsule.message!.substring(0, 20) + '...' 
                 : capsule.message!;
-              
-              // Get emotion tag
               const emotion = (capsule.emotion_tags && capsule.emotion_tags[0]) || '💭';
-              
               return {
                 id: `dm-${Date.now()}-${danmakuIdRef.current++}`,
                 text: `${emotion} ${text}`,
                 emotion: (capsule.emotion_tags && capsule.emotion_tags[0]) || '',
-                top: Math.random() * 80 + 10, // Random position between 10% and 90%
+                top: Math.random() * 80 + 10,
               };
             });
           
-          // Add new danmakus to state
           if (newDanmakus.length > 0) {
-            setDanmakus(prev => {
-              // Keep only recent danmakus (last 30)
-              const updated = [...prev, ...newDanmakus];
-              return updated.slice(-30);
-            });
+            setDanmakus(prev => [...prev, ...newDanmakus].slice(-30));
           }
         }
       } catch (error) {
@@ -59,15 +47,10 @@ const DanmakuLayer: React.FC = () => {
       }
     };
 
-    // Initial fetch
     fetchRecentCapsules();
+    const intervalId = setInterval(fetchRecentCapsules, 10000);
 
-    // Set up interval to fetch every 10 seconds
-    intervalId = setInterval(fetchRecentCapsules, 10000);
-
-    return () => {
-      if (intervalId) clearInterval(intervalId);
-    };
+    return () => clearInterval(intervalId);
   }, []);
 
   // Remove danmaku after animation completes

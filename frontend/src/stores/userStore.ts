@@ -24,7 +24,7 @@ interface UserState {
 
 const STORAGE_KEY = 'timespace_user_id'
 
-export const useUserStore = create<UserState>((set, _get) => ({
+export const useUserStore = create<UserState>((set) => ({
   user: null,
   isLoading: false,
   error: null,

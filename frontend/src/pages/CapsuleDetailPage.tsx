@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useCapsuleStore } from '../stores/capsuleStore'
 import { useOfflineCache } from '../hooks/useCapabilityCheck'
 import { responsesApi, favoritesApi } from '../lib/api'
+import { getErrorMessage } from '../lib/client'
 import type { Capsule, CapsuleResponse } from '../types'
 import { useUserStore } from '../stores/userStore'
 import { QRCodeSVG } from 'qrcode.react'
@@ -40,7 +41,7 @@ export default function CapsuleDetailPage() {
 
   useEffect(() => {
     if (!id) return
-    setFetchError(null)
+    queueMicrotask(() => setFetchError(null))
     const cached = getCached<Capsule>(`capsule_${id}`, 10 * 60 * 1000)
     if (cached && !selectedCapsule) {
       useCapsuleStore.setState({ selectedCapsule: cached })
@@ -73,41 +74,42 @@ export default function CapsuleDetailPage() {
 
   // Handle time lock countdown
   useEffect(() => {
-    if (selectedCapsule?.unlock_at) {
-      // Set initial time lock data
-      const locked = new Date() < new Date(selectedCapsule.unlock_at!)
+    if (!selectedCapsule?.unlock_at) return
+
+    const unlockTime = new Date(selectedCapsule.unlock_at).getTime()
+    const locked = Date.now() < unlockTime
+
+    // Set initial time lock data (deferred to avoid sync setState in effect body)
+    queueMicrotask(() => {
       setTimeLockData({
         locked,
         unlock_at: selectedCapsule.unlock_at,
-        countdown_seconds: locked 
-          ? Math.max(0, Math.floor((new Date(selectedCapsule.unlock_at!).getTime() - Date.now()) / 1000))
+        countdown_seconds: locked
+          ? Math.max(0, Math.floor((unlockTime - Date.now()) / 1000))
           : undefined
       })
-      
-      // If locked, start countdown
-      if (locked) {
-        const interval = setInterval(() => {
-          const remaining = Math.max(0, Math.floor((new Date(selectedCapsule.unlock_at!).getTime() - Date.now()) / 1000))
-          setTimeLockData(prev => prev ? {...prev, countdown_seconds: remaining} : null)
-          
-          if (remaining <= 0) {
-            // Unlock when countdown reaches zero
-            setTimeLockData(prev => prev ? {...prev, locked: false} : null)
-            clearInterval(interval)
-            // Refresh the page to show unlocked content
-            window.location.reload()
-          } else {
-            // Format countdown as DD:HH:MM:SS
-            const days = Math.floor(remaining / 86400)
-            const hours = Math.floor((remaining % 86400) / 3600)
-            const minutes = Math.floor((remaining % 3600) / 60)
-            const seconds = remaining % 60
-            setCountdown(`${days.toString().padStart(2, '0')}:${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`)
-          }
-        }, 1000)
+    })
+
+    // If locked, start countdown
+    if (locked) {
+      const interval = setInterval(() => {
+        const remaining = Math.max(0, Math.floor((unlockTime - Date.now()) / 1000))
+        setTimeLockData(prev => prev ? {...prev, countdown_seconds: remaining} : null)
         
-        return () => clearInterval(interval)
-      }
+        if (remaining <= 0) {
+          setTimeLockData(prev => prev ? {...prev, locked: false} : null)
+          clearInterval(interval)
+          window.location.reload()
+        } else {
+          const days = Math.floor(remaining / 86400)
+          const hours = Math.floor((remaining % 86400) / 3600)
+          const minutes = Math.floor((remaining % 3600) / 60)
+          const seconds = remaining % 60
+          setCountdown(`${days.toString().padStart(2, '0')}:${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`)
+        }
+      }, 1000)
+      
+      return () => clearInterval(interval)
     }
   }, [selectedCapsule])
 
@@ -132,8 +134,8 @@ export default function CapsuleDetailPage() {
       const response = await responsesApi.create(id, newResponse.trim())
       setResponses(prev => [...prev, response])
       setNewResponse('')
-    } catch (err: any) {
-      setResponseError(err.message || '发送失败')
+    } catch (err: unknown) {
+      setResponseError(getErrorMessage(err, '发送失败'))
     } finally {
       setIsSubmittingResponse(false)
     }
@@ -513,7 +515,11 @@ function VoicePlayer({ src, variant }: { src: string; variant: 'signal' | 'capsu
 
   const toggle = () => {
     if (!audioRef.current) return
-    playing ? audioRef.current.pause() : audioRef.current.play()
+    if (playing) {
+      audioRef.current.pause()
+    } else {
+      audioRef.current.play()
+    }
     setPlaying(!playing)
   }
 

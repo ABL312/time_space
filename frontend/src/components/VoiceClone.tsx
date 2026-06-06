@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import { aiApi } from '../lib/api'
+import { getErrorMessage } from '../lib/client'
 import type { VoiceCloneResult } from '../types'
 
 interface VoiceCloneProps {
@@ -16,11 +17,13 @@ interface VoiceCloneProps {
 type Status = 'idle' | 'recording' | 'uploading' | 'ready' | 'playing' | 'error'
 
 export default function VoiceClone({
-  capsuleId: _capsuleId,
+  capsuleId,
   onComplete,
   placeholder = '输入你想让这个声音说的话...',
   maxRecordSeconds = 10,
 }: VoiceCloneProps) {
+  // capsuleId is reserved for future voice-capsule association
+  void capsuleId
   const [status, setStatus] = useState<Status>('idle')
   const [text, setText] = useState('')
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
@@ -98,8 +101,8 @@ export default function VoiceClone({
       setResult(res)
       setStatus('ready')
       onComplete?.(res)
-    } catch (err: any) {
-      setErrorMsg(err.message || '声音克隆失败，请重试')
+    } catch (err: unknown) {
+      setErrorMsg(getErrorMessage(err, '声音克隆失败，请重试'))
       setStatus('error')
     }
   }, [audioBlob, text, onComplete])

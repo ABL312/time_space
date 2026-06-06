@@ -4,6 +4,14 @@ import 'leaflet/dist/leaflet.css'
 import 'leaflet.heat'
 import type { Capsule } from '../types'
 
+// leaflet.heat augments L with heatLayer but ships no types
+declare module 'leaflet' {
+  function heatLayer(
+    latlngs: Array<[number, number, number]>,
+    options?: Record<string, unknown>
+  ): L.Layer
+}
+
 interface MapViewProps {
   latitude: number
   longitude: number
@@ -20,7 +28,7 @@ export default function MapView({
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map | null>(null)
   const markersRef = useRef<L.LayerGroup | null>(null)
-  const heatLayerRef = useRef<any>(null)
+  const heatLayerRef = useRef<L.Layer | null>(null)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
   const [showHeatmap, setShowHeatmap] = useState(false)
 
@@ -173,7 +181,7 @@ export default function MapView({
       ])
 
       // Create and add heat layer
-      heatLayerRef.current = (L as any).heatLayer(heatData, {
+      heatLayerRef.current = L.heatLayer(heatData as Array<[number, number, number]>, {
         radius: 25,
         blur: 15,
         maxZoom: 17,

@@ -2,7 +2,7 @@ import { useState, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGeolocation } from '../hooks/useGeolocation'
 import { useUserStore } from '../stores/userStore'
-import { capsulesApi, aiApi } from '../lib/api'
+import { capsulesApi, aiApi, getErrorMessage } from '../lib/api'
 import { EMOTION_TAGS } from '../types'
 
 export default function CreatePage() {
@@ -111,8 +111,8 @@ export default function CreatePage() {
     try {
       const res = await aiApi.cloneVoice(voiceSampleBlob, cloneText || message)
       setVoiceCloneUrl(res.audio_url)
-    } catch (err: any) {
-      setError(err.message || '声音克隆失败')
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, '声音克隆失败'))
     } finally {
       setIsCloning(false)
     }
@@ -152,7 +152,7 @@ export default function CreatePage() {
         if (voiceCloneUrl) fd.append('voice_clone_url', voiceCloneUrl)
         await capsulesApi.create(fd)
         navigate('/')
-      } catch (err: any) { setError(err.message || '创建失败') }
+      } catch (err: unknown) { setError(getErrorMessage(err, '创建失败')) }
       finally { setIsSubmitting(false) }
     }
 

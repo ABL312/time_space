@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUserStore } from '../stores/userStore'
-import { usersApi } from '../lib/api'
+import { usersApi, getErrorMessage } from '../lib/api'
 import { INTEREST_TAGS } from '../types'
 import Starfield from '../components/Starfield'
 
@@ -38,8 +38,8 @@ export default function OnboardingPage() {
       })
       setUser(user)
       navigate('/')
-    } catch (err: any) {
-      setError(err.message || '注册失败，请重试')
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, '注册失败，请重试'))
     } finally {
       setIsSubmitting(false)
     }

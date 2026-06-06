@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { capsulesApi } from '../lib/api'
 import type { NearbyResponse } from '../types'
 
@@ -13,7 +13,6 @@ export function useApiWithTimeout<T>(
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState<boolean>(false)
   const [error, setError] = useState<string | null>(null)
-  const [retryCount, setRetryCount] = useState<number>(0)
 
   const { timeout = 5000 } = options
 
@@ -43,14 +42,8 @@ export function useApiWithTimeout<T>(
   }
 
   const retry = () => {
-    setRetryCount(prev => prev + 1)
+    execute()
   }
-
-  useEffect(() => {
-    if (retryCount > 0) {
-      execute()
-    }
-  }, [retryCount])
 
   return { data, loading, error, retry, execute }
 }

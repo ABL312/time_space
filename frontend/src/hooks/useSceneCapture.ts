@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { aiApi } from '../lib/api'
+import { getErrorMessage } from '../lib/client'
 import type { SceneResult } from '../types'
 
 interface UseSceneCaptureOptions {
@@ -74,9 +75,10 @@ export function useSceneCapture(
       const result = await aiApi.recognizeScene(blob, latitude, longitude)
       setScene(result)
       sceneRef.current = result
-    } catch (err: any) {
-      console.warn('Scene capture failed:', err.message)
-      setError(err.message || '场景识别失败')
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err, '场景识别失败')
+      console.warn('Scene capture failed:', msg)
+      setError(msg)
       // Don't clear previous result on transient errors
     } finally {
       setIsLoading(false)
@@ -86,13 +88,11 @@ export function useSceneCapture(
   // Start / restart the capture interval
   useEffect(() => {
     if (!cameraReady || !latitude || !longitude) {
-      // Camera not ready → clear scene (will trigger fallback)
-      setScene(null)
       return
     }
 
-    // Capture immediately on start
-    capture()
+    // Capture immediately on start (deferred to avoid sync setState in effect body)
+    queueMicrotask(() => capture())
 
     // Then capture every N ms
     intervalRef.current = window.setInterval(capture, interval)

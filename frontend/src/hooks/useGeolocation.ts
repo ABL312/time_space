@@ -159,16 +159,20 @@ export function useGeolocation(options: UseGeolocationOptions = {}) {
   useEffect(() => {
     // If geolocation API is not available, go straight to IP fallback
     if (!navigator.geolocation) {
-      setState((prev) => ({ ...prev, error: '浏览器不支持GPS定位，尝试IP定位...' }))
-      triggerIPFallback()
+      queueMicrotask(() => {
+        setState((prev) => ({ ...prev, error: '浏览器不支持GPS定位，尝试IP定位...' }))
+        triggerIPFallback()
+      })
       return
     }
 
     // If page is not a secure context (self-signed cert), the geolocation API
     // may exist but silently fail. Skip directly to IP fallback.
     if (typeof window.isSecureContext === 'boolean' && !window.isSecureContext) {
-      setState((prev) => ({ ...prev, error: '非安全上下文，GPS不可用，尝试IP定位...' }))
-      triggerIPFallback()
+      queueMicrotask(() => {
+        setState((prev) => ({ ...prev, error: '非安全上下文，GPS不可用，尝试IP定位...' }))
+        triggerIPFallback()
+      })
       return
     }
 

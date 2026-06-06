@@ -5,7 +5,7 @@ import { useVirtualLocation } from '../hooks/useVirtualLocation'
 import { useCapsuleStore } from '../stores/capsuleStore'
 import { useUserStore } from '../stores/userStore'
 import { useCapabilityCheck } from '../hooks/useCapabilityCheck'
-import { searchApi, dailyApi } from '../lib/api'
+import { searchApi, dailyApi, getErrorMessage } from '../lib/api'
 import MapView from '../components/MapView'
 import RecommendPanel from '../components/RecommendPanel'
 import { useProximityAlert } from '../hooks/useProximityAlert'
@@ -55,7 +55,7 @@ export default function HomePage() {
     setSearchError(null)
     
     try {
-      const params: any = {}
+      const params: { q?: string; tag?: string; lat?: number; lng?: number; radius?: number } = {}
       if (searchQuery.trim()) params.q = searchQuery.trim()
       if (selectedTag) params.tag = selectedTag
       if (effectiveLatitude && effectiveLongitude) {
@@ -66,8 +66,8 @@ export default function HomePage() {
       
       const results = await searchApi.search(params)
       setSearchResults(results)
-    } catch (err: any) {
-      setSearchError(err.message || '搜索失败')
+    } catch (err: unknown) {
+      setSearchError(getErrorMessage(err, '搜索失败'))
       console.error('Search error:', err)
     } finally {
       setIsSearching(false)

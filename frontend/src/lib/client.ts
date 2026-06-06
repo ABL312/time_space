@@ -106,6 +106,14 @@ export async function upload<T>(
   }
 }
 
+/** Extract a human-readable message from an unknown error */
+export function getErrorMessage(err: unknown, fallback = '操作失败'): string {
+  if (err instanceof ApiError) return err.message
+  if (err instanceof Error) return err.message
+  if (typeof err === 'string') return err
+  return fallback
+}
+
 /** Build query string from params, omitting undefined/null values */
 export function buildQuery(params: Record<string, string | number | boolean | undefined | null>): string {
   const searchParams = new URLSearchParams()

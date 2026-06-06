@@ -255,7 +255,11 @@ function VoicePlayer({ src, variant }: { src: string; variant: 'signal' | 'capsu
 
   const toggle = () => {
     if (!audioRef.current) return
-    playing ? audioRef.current.pause() : audioRef.current.play()
+    if (playing) {
+      audioRef.current.pause()
+    } else {
+      audioRef.current.play()
+    }
     setPlaying(!playing)
   }
 
