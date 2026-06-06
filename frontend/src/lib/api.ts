@@ -184,6 +184,77 @@ export const aiApi = {
 }
 
 // ==========================================
+// Responses API
+// ==========================================
+export const responsesApi = {
+  list: (capsuleId: string) => fetch(`/api/capsules/${capsuleId}/responses`).then(r => r.json()),
+  create: (capsuleId: string, content: string, userId?: string, nickname?: string) =>
+    fetch(`/api/capsules/${capsuleId}/responses`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ content, user_id: userId, nickname: nickname || '匿名' })
+    }).then(r => r.json())
+}
+
+// ==========================================
+// Daily API
+// ==========================================
+export const dailyApi = {
+  getRecommend: () => fetch('/api/capsules/daily-recommend').then(r => r.json())
+}
+
+// ==========================================
+// Favorites API
+// ==========================================
+export const favoritesApi = {
+  add: (capsuleId: string, userId: string) =>
+    fetch(`/api/favorites/${capsuleId}?user_id=${userId}`, { method: 'POST' }),
+  remove: (capsuleId: string, userId: string) =>
+    fetch(`/api/favorites/${capsuleId}?user_id=${userId}`, { method: 'DELETE' }),
+  list: (userId: string) => fetch(`/api/favorites?user_id=${userId}`).then(r => r.json()),
+  status: (capsuleId: string, userId: string) =>
+    fetch(`/api/capsules/${capsuleId}/favorite-status?user_id=${userId}`).then(r => r.json())
+}
+
+// ==========================================
+// Profile API
+// ==========================================
+export const profileApi = {
+  getStats: (userId: string) => fetch(`/api/users/${userId}/stats`).then(r => r.json())
+}
+
+// ==========================================
+// Search API
+// ==========================================
+export const searchApi = {
+  search: (params: { q?: string; tag?: string; lat?: number; lng?: number; radius?: number }) => {
+    const query = new URLSearchParams()
+    if (params.q) query.set('q', params.q)
+    if (params.tag) query.set('tag', params.tag)
+    if (params.lat) query.set('lat', String(params.lat))
+    if (params.lng) query.set('lng', String(params.lng))
+    if (params.radius) query.set('radius', String(params.radius))
+    return fetch(`/api/capsules/search?${query}`).then(r => r.json())
+  }
+}
+
+// ==========================================
+// Share API
+// ==========================================
+export const shareApi = {
+  getByToken: (token: string) => fetch(`/api/capsules/shared/${token}`).then(r => r.json()),
+  regenerate: (capsuleId: string) => fetch(`/api/capsules/${capsuleId}/regenerate-share`, { method: 'POST' }).then(r => r.json())
+}
+
+// ==========================================
+// Collections API
+// ==========================================
+export const collectionsApi = {
+  list: () => fetch('/api/collections').then(r => r.json()),
+  get: (id: string) => fetch(`/api/collections/${id}`).then(r => r.json())
+}
+
+// ==========================================
 // Health check
 // ==========================================
 export function healthCheck(): Promise<{ status: string }> {

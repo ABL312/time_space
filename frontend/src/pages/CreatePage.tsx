@@ -21,6 +21,10 @@ export default function CreatePage() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   
+  // Time lock states
+  const [useTimeLock, setUseTimeLock] = useState(false)
+  const [unlockAt, setUnlockAt] = useState<string>('')
+  
   // Voice clone states
   const [voiceSampleBlob, setVoiceSampleBlob] = useState<Blob | null>(null)
   const [isSampleRecording, setIsSampleRecording] = useState(false)
@@ -116,9 +120,18 @@ export default function CreatePage() {
 
   const canSubmit = message.length >= 10 && message.length <= 500 && latitude && longitude
 
+  // Calculate minimum unlock time (tomorrow)
+  const getMinUnlockTime = () => {
+    const tomorrow = new Date()
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    // Format as YYYY-MM-DDTHH:mm for datetime-local input
+    return tomorrow.toISOString().slice(0, 16)
+  }
+
   const handleSubmit = async () => {
       if (!canSubmit || !latitude || !longitude) return
       if (!user) { setError('请先登录'); return }
+      if (useTimeLock && !unlockAt) { setError('请选择解锁时间'); return }
       setIsSubmitting(true)
       setError(null)
       try {
@@ -129,6 +142,11 @@ export default function CreatePage() {
         fd.append('longitude', String(longitude))
         fd.append('visibility', visibility)
         if (moodTags.length > 0) fd.append('mood_tag', moodTags[0])
+        if (useTimeLock && unlockAt) {
+          // Convert to UTC string
+          const unlockDate = new Date(unlockAt)
+          fd.append('unlock_at', unlockDate.toISOString())
+        }
         photos.forEach((p) => fd.append('photos', p))
         if (voiceBlob) fd.append('voice', voiceBlob, 'recording.webm')
         if (voiceCloneUrl) fd.append('voice_clone_url', voiceCloneUrl)
@@ -345,6 +363,51 @@ export default function CreatePage() {
                 </button>
               )
             })}
+          </div>
+        </section>
+
+        {/* TIME LOCK */}
+        <section>
+          <div className="label mb-2 flex items-center gap-2">
+            <span className="inline-block w-2 h-px bg-signal-dim" />
+            TIME_LOCK
+          </div>
+          <div className="panel p-4 space-y-4">
+            {/* Toggle switch */}
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-slate-300">设置开启时间</span>
+              <button
+                onClick={() => setUseTimeLock(!useTimeLock)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  useTimeLock ? 'bg-signal' : 'bg-surface-light'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    useTimeLock ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* DateTime picker */}
+            {useTimeLock && (
+              <div className="pt-2 border-t border-border">
+                <label className="block text-xs font-mono text-slate-500 mb-2">
+                  解锁时间 (至少明天)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={unlockAt}
+                  onChange={(e) => setUnlockAt(e.target.value)}
+                  min={getMinUnlockTime()}
+                  className="w-full px-3 py-2 bg-surface border border-border text-white focus:outline-none focus:border-signal transition-colors text-sm"
+                />
+                <p className="mt-2 text-xs text-slate-500">
+                  胶囊将在设定的时间自动解锁，之前无法查看内容
+                </p>
+              </div>
+            )}
           </div>
         </section>
 

@@ -46,6 +46,7 @@ class CapsuleCreate(BaseModel):
     mood_tag: Optional[str] = None
     visibility: str = "public"
     target_user_id: Optional[str] = None
+    unlock_at: Optional[str] = None  # ISO format datetime string
 
 
 class CapsuleResponse(BaseModel):
@@ -67,6 +68,7 @@ class CapsuleResponse(BaseModel):
     emotion_summary: Optional[str] = None
     mood_tag: Optional[str] = None
     visibility: str = "public"
+    unlock_at: Optional[str] = None  # ISO format datetime string
     open_count: int = 0
     created_at: str
     media: Optional[list[dict]] = None
@@ -152,3 +154,25 @@ class InteractionCreate(BaseModel):
     user_id: str
     action: str  # open/reply/react
     reaction: Optional[str] = None
+
+
+# ==========================================
+# Response models
+# ==========================================
+class ResponseCreateModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    user_id: Optional[str] = None
+    nickname: str = "匿名"
+    content: str = Field(..., min_length=1, max_length=500)
+
+
+class ResponseModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    id: str
+    capsule_id: str
+    user_id: Optional[str] = None
+    nickname: str
+    content: str
+    created_at: str
