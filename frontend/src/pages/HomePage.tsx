@@ -13,6 +13,7 @@ import ProximityAlert from '../components/ProximityAlert'
 import { useAchievements } from '../hooks/useAchievements'
 import AchievementPanel from '../components/AchievementPanel'
 import DanmakuLayer from '../components/DanmakuLayer'
+import { Card, Badge, Button, Input } from '../components/ui'
 import type { Capsule } from '../types'
 
 export default function HomePage() {
@@ -35,11 +36,9 @@ export default function HomePage() {
   const [searchError, setSearchError] = useState<string | null>(null)
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
   
-  // 优先使用虚拟位置，否则使用真实位置，最后使用默认演示位置
   const effectiveLatitude = virtualLocation?.lat ?? latitude ?? 31.0282
   const effectiveLongitude = virtualLocation?.lng ?? longitude ?? 121.4346
   
-  // Proximity alert hook
   const { triggeredCapsule, distance, dismiss } = useProximityAlert({
     userLat: effectiveLatitude,
     userLng: effectiveLongitude,
@@ -87,7 +86,6 @@ export default function HomePage() {
     }
   }, [effectiveLatitude, effectiveLongitude, user, fetchNearby, radius])
 
-  // Fetch daily recommendation
   useEffect(() => {
     dailyApi.getRecommend()
       .then((data: Capsule) => {
@@ -107,6 +105,11 @@ export default function HomePage() {
     }
   }
 
+  const formatDistance = (m: number | null | undefined) => {
+    if (m == null) return '未知距离'
+    return m < 1000 ? `${Math.round(m)}m` : `${(m / 1000).toFixed(1)}km`
+  }
+
   return (
     <div className="relative h-screen w-screen overflow-hidden bg-void">
       {/* Map */}
@@ -123,10 +126,12 @@ export default function HomePage() {
         <div className="absolute inset-0 pt-24 pb-24 px-3 z-10 overflow-y-auto">
           <div className="space-y-3">
             {searchResults.map((capsule) => (
-              <div 
+              <Card
                 key={capsule.id}
+                variant="hud"
+                padding="md"
                 onClick={() => navigate(`/capsule/${capsule.id}`)}
-                className="panel p-4 cursor-pointer hover:border-signal/30 transition-colors"
+                className="cursor-pointer hover:border-signal/30 transition-colors"
               >
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
@@ -134,30 +139,23 @@ export default function HomePage() {
                       <span className="text-sm font-medium text-white truncate">
                         {capsule.author?.name || '匿名发送者'}
                       </span>
-                      <span className="data text-xs">
-                        {capsule.distance_m != null ? (
-                          `${capsule.distance_m < 1000 ? `${Math.round(capsule.distance_m)}m` : `${(capsule.distance_m / 1000).toFixed(1)}km`}`
-                        ) : (
-                          '未知距离'
-                        )}
+                      <span className="text-xs text-text-tertiary font-mono">
+                        {formatDistance(capsule.distance_m)}
                       </span>
                     </div>
                     <p className="text-sm text-slate-300 line-clamp-2">
                       {capsule.message}
                     </p>
-                    <div className="flex flex-wrap gap-1.5 mt-2">
-                      {capsule.emotion_tags?.slice(0, 3).map((tag) => (
-                        <span 
-                          key={tag}
-                          className="px-1.5 py-0.5 text-xs font-mono border border-primary/20 text-primary-light bg-primary/5"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
+                    {capsule.emotion_tags && capsule.emotion_tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-2">
+                        {capsule.emotion_tags.slice(0, 3).map((tag) => (
+                          <Badge key={tag} variant="signal">{tag}</Badge>
+                        ))}
+                      </div>
+                    )}
                   </div>
                   {capsule.media && capsule.media.length > 0 && (
-                    <div className="w-16 h-16 border border-border flex-shrink-0">
+                    <div className="w-16 h-16 border border-border flex-shrink-0 rounded-[var(--radius-sm)] overflow-hidden">
                       <img 
                         src={capsule.media[0].thumbnail_url || capsule.media[0].url} 
                         alt=""
@@ -170,7 +168,7 @@ export default function HomePage() {
                     </div>
                   )}
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </div>
@@ -182,135 +180,117 @@ export default function HomePage() {
       {/* ── TOP HUD OVERLAY ── */}
       <div className="absolute top-3 left-3 right-3 z-20 space-y-2">
         {/* Search bar */}
-          <div className="hud p-2 flex items-center gap-2">
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="搜索胶囊..."
-              className="flex-1 bg-transparent border-none text-white placeholder-slate-500 focus:outline-none text-sm"
-            />
-            {searchQuery || selectedTag || searchResults.length > 0 ? (
-              <button 
-                onClick={clearSearch}
-                className="btn w-6 h-6 flex items-center justify-center text-slate-400 hover:text-signal"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            ) : (
-              <button 
-                onClick={handleSearch}
-                disabled={isSearching || (!searchQuery.trim() && !selectedTag)}
-                className="btn w-6 h-6 flex items-center justify-center text-slate-400 hover:text-signal disabled:opacity-50"
-              >
-                {isSearching ? (
-                  <div className="w-4 h-4 border border-signal border-t-transparent animate-spin" />
-                ) : (
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                  </svg>
-                )}
-              </button>
-            )}
-          </div>
-          
-          {/* Daily Recommendation Card */}
-          {dailyRecommendation && !searchResults.length && (
-            <div 
-              onClick={() => navigate(`/capsule/${dailyRecommendation.id}`)}
-              className="hud panel p-4 cursor-pointer hover:border-signal/30 transition-colors"
+        <Card variant="hud" padding="sm" className="flex items-center gap-2">
+          <Input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            placeholder="搜索胶囊..."
+            className="flex-1 !border-none !bg-transparent !p-0 text-sm"
+          />
+          {searchQuery || selectedTag || searchResults.length > 0 ? (
+            <Button variant="icon" size="icon-sm" onClick={clearSearch}>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </Button>
+          ) : (
+            <Button
+              variant="icon"
+              size="icon-sm"
+              onClick={handleSearch}
+              disabled={isSearching || (!searchQuery.trim() && !selectedTag)}
             >
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-2 h-2 bg-signal rounded-full" />
-                <span className="label text-signal">今日推荐</span>
-              </div>
-              <p className="text-sm text-white mb-2 line-clamp-2">
-                {dailyRecommendation.message?.substring(0, 30)}{dailyRecommendation.message && dailyRecommendation.message.length > 30 ? '...' : ''}
-              </p>
+              {isSearching ? (
+                <span className="w-4 h-4 border border-signal border-t-transparent animate-spin rounded-full" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
+                </svg>
+              )}
+            </Button>
+          )}
+        </Card>
+          
+        {/* Daily Recommendation Card */}
+        {dailyRecommendation && !searchResults.length && (
+          <Card
+            variant="hud"
+            padding="md"
+            onClick={() => navigate(`/capsule/${dailyRecommendation.id}`)}
+            className="cursor-pointer hover:border-signal/30 transition-colors"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <Badge variant="signal" dot>今日推荐</Badge>
+            </div>
+            <p className="text-sm text-white mb-2 line-clamp-2">
+              {dailyRecommendation.message?.substring(0, 30)}{dailyRecommendation.message && dailyRecommendation.message.length > 30 ? '...' : ''}
+            </p>
+            {dailyRecommendation.emotion_tags && dailyRecommendation.emotion_tags.length > 0 && (
               <div className="flex flex-wrap gap-1">
-                {dailyRecommendation.emotion_tags?.slice(0, 2).map((tag) => (
-                  <span 
-                    key={tag}
-                    className="px-1.5 py-0.5 text-xs font-mono border border-primary/20 text-primary-light bg-primary/5"
-                  >
-                    {tag}
-                  </span>
+                {dailyRecommendation.emotion_tags.slice(0, 2).map((tag) => (
+                  <Badge key={tag} variant="signal">{tag}</Badge>
                 ))}
               </div>
-            </div>
-          )}
+            )}
+          </Card>
+        )}
         
         {/* Search error */}
         {searchError && (
-          <div className="hud px-3 py-2 border-data-bad/20 flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-data-bad" />
-            <span className="data text-data-bad">{searchError}</span>
-          </div>
+          <Card variant="hud" padding="sm" className="border-data-bad/20 flex items-center gap-2">
+            <Badge variant="error" dot>{searchError}</Badge>
+          </Card>
         )}
         
         {/* Tag filters */}
         {searchResults.length > 0 && (
           <div className="flex gap-1.5 overflow-x-auto pb-1">
             {['怀旧', '温暖', '感恩', '浪漫', '思念', '快乐', '遗憾', '鼓励'].map((tag) => (
-              <button
+              <Button
                 key={tag}
+                variant={selectedTag === tag ? 'primary' : 'ghost'}
+                size="sm"
                 onClick={() => {
                   setSelectedTag(selectedTag === tag ? null : tag)
                   setTimeout(handleSearch, 0)
                 }}
-                className={`btn flex-shrink-0 px-2.5 py-1 text-xs border transition-all ${
-                  selectedTag === tag
-                    ? 'border-primary/40 bg-primary/5 text-primary-light'
-                    : 'border-border text-slate-400 hover:text-slate-200'
-                }`}
+                className={`flex-shrink-0 ${selectedTag === tag ? '' : 'border border-border'}`}
               >
                 {tag}
-              </button>
+              </Button>
             ))}
           </div>
         )}
         
         {/* Coordinate readout */}
         {effectiveLatitude && effectiveLongitude && (
-          <div className="hud px-3 py-2 inline-flex items-center gap-3">
-            <div className={`w-1.5 h-1.5 ${cap.isOnline ? 'bg-data-good breathe' : 'bg-data-bad'}`} />
-            <span className="data">
-              {effectiveLatitude.toFixed(4)}°N <span className="text-slate-600">/</span> {effectiveLongitude.toFixed(4)}°E
+          <Card variant="hud" padding="sm" className="inline-flex items-center gap-3">
+            <div className={`w-1.5 h-1.5 rounded-full ${cap.isOnline ? 'bg-data-good breathe' : 'bg-data-bad'}`} />
+            <span className="text-xs font-mono text-text-secondary">
+              {effectiveLatitude.toFixed(4)}°N <span className="text-text-muted">/</span> {effectiveLongitude.toFixed(4)}°E
             </span>
-            {virtualLocation && (
-              <span className="data text-data-warn border border-data-warn/30 px-1.5 py-0.5">
-                VIRTUAL LOCATION
-              </span>
-            )}
-            {locationSource === 'ip' && (
-              <span className="data text-data-warn border border-data-warn/30 px-1.5 py-0.5">
-                IP定位 ≈5km
-              </span>
-            )}
-            {cap.useExpandedGPS && (
-              <span className="data text-data-warn border border-data-warn/30 px-1.5 py-0.5">
-                GPS DEGRADED
-              </span>
-            )}
-          </div>
+            {virtualLocation && <Badge variant="warning">VIRTUAL LOCATION</Badge>}
+            {locationSource === 'ip' && <Badge variant="warning">IP定位 ≈5km</Badge>}
+            {cap.useExpandedGPS && <Badge variant="warning">GPS DEGRADED</Badge>}
+          </Card>
         )}
 
         {/* Warning banners */}
         {!cap.isOnline && (
-          <div className="hud px-3 py-2 border-data-warn/20 flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-data-warn breathe" />
-            <span className="data text-data-warn">OFFLINE — DISPLAYING CACHED DATA</span>
-          </div>
+          <Card variant="hud" padding="sm" className="border-data-warn/20 flex items-center gap-2">
+            <Badge variant="warning" dot>OFFLINE — DISPLAYING CACHED DATA</Badge>
+          </Card>
         )}
         {geoError && (
-          <div className={`hud px-3 py-2 flex items-center gap-2 ${geoError.includes('正在') ? 'border-data-warn/20' : 'border-data-bad/20'}`}>
-            <div className={`w-1.5 h-1.5 ${geoError.includes('正在') ? 'bg-data-warn breathe' : 'bg-data-bad'}`} />
-            <span className={`data ${geoError.includes('正在') ? 'text-data-warn' : 'text-data-bad'}`}>{geoError}</span>
+          <Card variant="hud" padding="sm" className={`flex items-center gap-2 ${geoError.includes('正在') ? 'border-data-warn/20' : 'border-data-bad/20'}`}>
+            <Badge variant={geoError.includes('正在') ? 'warning' : 'error'} dot>
+              {geoError}
+            </Badge>
             {!geoError.includes('正在') && (
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => {
                   const lat = prompt('输入纬度 (例如: 31.0282)', '31.0282')
                   const lng = prompt('输入经度 (例如: 121.4346)', '121.4346')
@@ -318,91 +298,64 @@ export default function HomePage() {
                     setVirtual(parseFloat(lat), parseFloat(lng))
                   }
                 }}
-                className="btn ml-1 text-signal border border-signal/20 px-2 py-0.5 text-xs"
+                className="text-signal border border-signal/20"
               >
                 手动设置
-              </button>
+              </Button>
             )}
-          </div>
+          </Card>
         )}
       </div>
 
-      {/* ── TOP-RIGHT: Loading + Logout ── */}
+      {/* ── TOP-RIGHT: Loading + Actions ── */}
       <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
         {isLoadingNearby && (
-          <div className="hud px-3 py-1.5 flex items-center gap-2">
-            <div className="w-2.5 h-2.5 border border-signal border-t-transparent animate-spin" />
-            <span className="data text-signal">SCANNING</span>
-          </div>
+          <Card variant="hud" padding="sm" className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 border border-signal border-t-transparent animate-spin rounded-full" />
+            <span className="text-xs font-mono text-signal">SCANNING</span>
+          </Card>
         )}
-        <button
-          onClick={() => navigate('/profile')}
-          className="btn hud w-8 h-8 flex items-center justify-center text-slate-400 hover:text-signal transition-colors"
-          title="个人主页"
-        >
+        <Button variant="icon" size="icon-md" onClick={() => navigate('/profile')} title="个人主页" className="hud">
           <div className="w-5 h-5 border border-signal-dim/30 flex items-center justify-center bg-signal/5 rounded">
             <span className="text-xs font-semibold text-signal font-mono">
               {user?.name?.charAt(0)?.toUpperCase() || '?'}
             </span>
           </div>
-        </button>
-        <button
-          onClick={() => navigate('/collections')}
-          className="btn hud px-2.5 py-1.5 flex items-center gap-1.5 text-slate-400 hover:text-purple-400 transition-colors"
-          title="胶囊合集"
-        >
+        </Button>
+        <Button variant="icon" size="icon-md" onClick={() => navigate('/collections')} title="胶囊合集" className="hud text-slate-400 hover:text-purple-400">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
           </svg>
-          <span className="data">合集</span>
-        </button>
-        <button
-          onClick={() => navigate('/favorites')}
-          className="btn hud px-2.5 py-1.5 flex items-center gap-1.5 text-slate-400 hover:text-red-400 transition-colors"
-          title="我的收藏"
-        >
+        </Button>
+        <Button variant="icon" size="icon-md" onClick={() => navigate('/favorites')} title="我的收藏" className="hud text-slate-400 hover:text-red-400">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
           </svg>
-          <span className="data">收藏</span>
-        </button>
-        <button
-          onClick={() => setIsAchievementPanelOpen(true)}
-          className="btn hud px-2.5 py-1.5 flex items-center gap-1.5 text-slate-400 hover:text-yellow-300 transition-colors"
-          title="成就系统"
-        >
+        </Button>
+        <Button variant="icon" size="icon-md" onClick={() => setIsAchievementPanelOpen(true)} title="成就系统" className="hud text-slate-400 hover:text-yellow-300">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
           </svg>
-          <span className="data">成就</span>
-        </button>
-        <button
-          onClick={() => navigate('/mine')}
-          className="btn hud px-2.5 py-1.5 flex items-center gap-1.5 text-slate-400 hover:text-capsule transition-colors"
-          title="我的胶囊"
-        >
+        </Button>
+        <Button variant="icon" size="icon-md" onClick={() => navigate('/mine')} title="我的胶囊" className="hud text-slate-400 hover:text-capsule">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
           </svg>
-          <span className="data">MINE</span>
-        </button>
-        <button
-          onClick={clearUser}
-          className="btn hud px-2.5 py-1.5 flex items-center gap-1.5 text-slate-400 hover:text-signal transition-colors"
-          title={`退出 ${user?.name || ''}`}
-        >
+        </Button>
+        <Button variant="icon" size="icon-md" onClick={clearUser} title={`退出 ${user?.name || ''}`} className="hud text-slate-400 hover:text-signal">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
           </svg>
-          <span className="data">{user?.name?.slice(0, 6) || 'EXIT'}</span>
-        </button>
+        </Button>
       </div>
 
       {/* ── FLOATING ACTION BUTTONS ── */}
       <div className="absolute bottom-24 right-3 z-10 flex flex-col gap-2">
-        <button
+        <Button
+          variant="icon"
+          size="icon-md"
           onClick={handleExplore}
-          className="btn w-11 h-11 hud flex items-center justify-center text-signal border-signal/20"
+          className="hud border border-signal/20 text-signal"
           title={cap.shouldSkipAR ? 'Browse' : 'AR Explore'}
         >
           {cap.shouldSkipAR ? (
@@ -415,18 +368,21 @@ export default function HomePage() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           )}
-        </button>
-        <button
+        </Button>
+        <Button
+          variant="icon"
+          size="icon-md"
           onClick={() => navigate('/create')}
-          className="btn w-11 h-11 border border-capsule/25 bg-capsule/5 flex items-center justify-center text-capsule"
+          className="border border-capsule/25 bg-capsule/5 text-capsule"
           title="Create Capsule"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
           </svg>
-        </button>
-        {/* 虚拟定位设置按钮 */}
-        <button
+        </Button>
+        <Button
+          variant="icon"
+          size="icon-md"
           onClick={() => {
             const lat = prompt('输入纬度 (例如: 31.0282)', '31.0282')
             const lng = prompt('输入经度 (例如: 121.4346)', '121.4346')
@@ -434,13 +390,13 @@ export default function HomePage() {
               setVirtual(parseFloat(lat), parseFloat(lng))
             }
           }}
-          className="btn w-11 h-11 border border-data-warn/25 bg-data-warn/5 flex items-center justify-center text-data-warn"
+          className="border border-data-warn/25 bg-data-warn/5 text-data-warn"
           title="Set Virtual Location"
         >
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
           </svg>
-        </button>
+        </Button>
       </div>
 
       {/* ── RECOMMEND PANEL ── */}

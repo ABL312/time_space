@@ -4,6 +4,7 @@ import { useGeolocation } from '../hooks/useGeolocation'
 import { useUserStore } from '../stores/userStore'
 import { capsulesApi, aiApi, getErrorMessage } from '../lib/api'
 import { EMOTION_TAGS } from '../types'
+import { PageShell, Card, Badge, Button, SectionLabel } from '../components/ui'
 
 export default function CreatePage() {
   const navigate = useNavigate()
@@ -80,7 +81,6 @@ export default function CreatePage() {
         mr.start()
         voiceSampleRecorderRef.current = mr
         setIsSampleRecording(true)
-        // 10 second limit for voice sample
         setTimeout(() => { if (mr.state === 'recording') { mr.stop(); setIsSampleRecording(false) } }, 10000)
       } catch { setError('无法访问麦克风') }
     }, [])
@@ -120,11 +120,9 @@ export default function CreatePage() {
 
   const canSubmit = message.length >= 10 && message.length <= 500 && latitude && longitude
 
-  // Calculate minimum unlock time (tomorrow)
   const getMinUnlockTime = () => {
     const tomorrow = new Date()
     tomorrow.setDate(tomorrow.getDate() + 1)
-    // Format as YYYY-MM-DDTHH:mm for datetime-local input
     return tomorrow.toISOString().slice(0, 16)
   }
 
@@ -143,7 +141,6 @@ export default function CreatePage() {
         fd.append('visibility', visibility)
         if (moodTags.length > 0) fd.append('mood_tag', moodTags[0])
         if (useTimeLock && unlockAt) {
-          // Convert to UTC string
           const unlockDate = new Date(unlockAt)
           fd.append('unlock_at', unlockDate.toISOString())
         }
@@ -157,82 +154,60 @@ export default function CreatePage() {
     }
 
   return (
-    <div className="min-h-screen bg-bg page-in">
-      {/* NAV */}
-      <header className="sticky top-0 z-30 hud px-4 py-3 flex items-center justify-between">
-        <button onClick={() => navigate(-1)} className="btn flex items-center gap-2 text-slate-400 hover:text-signal transition-colors">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-          </svg>
-          <span className="text-xs font-mono tracking-wider">RETURN</span>
-        </button>
-        <span className="label">DEPLOY CAPSULE</span>
-        <div className="w-16" />
-      </header>
-
+    <PageShell title="DEPLOY CAPSULE" backTo={-1}>
       <div className="max-w-lg mx-auto px-4 py-6 pb-28 space-y-6 stagger">
 
         {/* GPS */}
         <section>
-          <div className="label mb-2 flex items-center gap-2">
-            <span className="inline-block w-2 h-px bg-signal-dim" />
-            LOCATION_LOCK
-          </div>
-          <div className="panel p-3">
+          <SectionLabel>LOCATION_LOCK</SectionLabel>
+          <Card variant="default" padding="sm" className="mt-2">
             {latitude && longitude ? (
               <div className="flex items-center justify-between">
-                <span className="data-value text-sm font-mono">{latitude.toFixed(6)}°N</span>
-                <span className="data-value text-sm font-mono">{longitude.toFixed(6)}°E</span>
-                <div className="w-2 h-2 bg-data-good" />
+                <span className="text-sm font-mono text-text-primary">{latitude.toFixed(6)}°N</span>
+                <span className="text-sm font-mono text-text-primary">{longitude.toFixed(6)}°E</span>
+                <Badge variant="success" dot>LOCKED</Badge>
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-data-warn breathe" />
-                <span className="data text-data-warn">{geoError || 'Acquiring position...'}</span>
+                <Badge variant="warning" dot>{geoError || 'Acquiring position...'}</Badge>
               </div>
             )}
-          </div>
+          </Card>
         </section>
 
         {/* MESSAGE */}
         <section>
-          <div className="label mb-2 flex items-center gap-2">
-            <span className="inline-block w-2 h-px bg-signal-dim" />
-            MESSAGE_PAYLOAD
-          </div>
+          <SectionLabel>MESSAGE_PAYLOAD</SectionLabel>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="写下你想留在这里的话..."
             maxLength={500}
             rows={5}
-            className="w-full px-4 py-3 bg-surface border border-border text-white placeholder-slate-600 focus:outline-none focus:border-signal transition-colors resize-none text-sm leading-relaxed"
+            className="mt-2 w-full px-4 py-3 bg-surface border border-border rounded-[var(--radius-md)] text-white placeholder-slate-600 focus:outline-none focus:border-signal transition-colors resize-none text-sm leading-relaxed"
           />
           <div className="flex justify-between mt-1">
-            <span className={`data ${message.length < 10 ? 'text-data-warn' : 'text-data-good'}`}>
+            <span className={`text-xs font-mono ${message.length < 10 ? 'text-data-warn' : 'text-data-good'}`}>
               {message.length < 10 ? `MIN ${10 - message.length} CHARS MORE` : 'VALID'}
             </span>
-            <span className="data">{message.length}/500</span>
+            <span className="text-xs font-mono text-text-tertiary">{message.length}/500</span>
           </div>
         </section>
 
         {/* PHOTOS */}
         <section>
-          <div className="label mb-2 flex items-center gap-2">
-            <span className="inline-block w-2 h-px bg-signal-dim" />
-            PHOTO_ARCHIVE [max 5]
-          </div>
-          <div className="flex flex-wrap gap-2">
+          <SectionLabel>PHOTO_ARCHIVE [max 5]</SectionLabel>
+          <div className="flex flex-wrap gap-2 mt-2">
             {photos.map((photo, i) => (
-              <div key={i} className="relative w-20 h-20 border border-border overflow-hidden">
+              <div key={i} className="relative w-20 h-20 border border-border rounded-[var(--radius-sm)] overflow-hidden">
                 <img src={URL.createObjectURL(photo)} alt="" className="w-full h-full object-cover" />
                 <button onClick={() => removePhoto(i)}
-                  className="absolute top-0.5 right-0.5 w-4 h-4 bg-data-bad/90 text-white text-[10px] flex items-center justify-center">×</button>
+                  className="absolute top-0.5 right-0.5 w-4 h-4 bg-data-bad/90 text-white text-[10px] flex items-center justify-center rounded-full">×</button>
               </div>
             ))}
             {photos.length < 5 && (
               <button onClick={() => fileInputRef.current?.click()}
-                className="w-20 h-20 border border-dashed border-surface-light flex items-center justify-center text-slate-500 hover:border-signal hover:text-signal transition-colors">
+                className="w-20 h-20 border border-dashed border-surface-light rounded-[var(--radius-sm)] flex items-center justify-center text-slate-500 hover:border-signal hover:text-signal transition-colors">
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                 </svg>
@@ -243,124 +218,110 @@ export default function CreatePage() {
         </section>
 
         {/* VOICE */}
-                <section>
-                  <div className="label mb-2 flex items-center gap-2">
-                    <span className="inline-block w-2 h-px bg-signal-dim" />
-                    VOICE_RECORD [optional, max 60s]
-                  </div>
-                  {voiceBlob ? (
-                    <div className="panel p-3 flex items-center gap-3">
-                      <audio src={URL.createObjectURL(voiceBlob)} controls className="flex-1 h-8" />
-                      <button onClick={() => setVoiceBlob(null)} className="data text-data-bad hover:text-red-300 transition-colors">CLEAR</button>
-                    </div>
-                  ) : (
-                    <button onClick={isRecording ? stopRecording : startRecording}
-                      className={`btn w-full py-3 border text-xs font-mono tracking-wider transition-all ${
-                        isRecording
-                          ? 'border-data-bad/30 bg-data-bad/5 text-data-bad'
-                          : 'border-border bg-surface/50 text-slate-400 hover:border-surface-light'
-                      }`}>
-                      {isRecording ? 'STOP RECORDING' : 'START RECORDING'}
-                    </button>
-                  )}
-                </section>
+        <section>
+          <SectionLabel>VOICE_RECORD [optional, max 60s]</SectionLabel>
+          {voiceBlob ? (
+            <Card variant="default" padding="sm" className="mt-2 flex items-center gap-3">
+              <audio src={URL.createObjectURL(voiceBlob)} controls className="flex-1 h-8" />
+              <Button variant="danger" size="sm" onClick={() => setVoiceBlob(null)}>CLEAR</Button>
+            </Card>
+          ) : (
+            <Button
+              variant={isRecording ? 'danger' : 'secondary'}
+              size="lg"
+              onClick={isRecording ? stopRecording : startRecording}
+              className="w-full mt-2 font-mono tracking-wider"
+            >
+              {isRecording ? 'STOP RECORDING' : 'START RECORDING'}
+            </Button>
+          )}
+        </section>
 
-                {/* VOICE CLONE */}
-                <section>
-                  <div className="label mb-2 flex items-center gap-2">
-                    <span className="inline-block w-2 h-px bg-signal-dim" />
-                    AI_VOICE_CLONE [optional]
-                  </div>
-                  <div className="panel p-4 space-y-4">
-                    <p className="text-sm text-slate-400">上传 10 秒语音样本，AI 将用你的声音朗读留言</p>
+        {/* VOICE CLONE */}
+        <section>
+          <SectionLabel>AI_VOICE_CLONE [optional]</SectionLabel>
+          <Card variant="default" padding="md" className="mt-2 space-y-4">
+            <p className="text-sm text-text-secondary">上传 10 秒语音样本，AI 将用你的声音朗读留言</p>
             
-                    {/* Sample Recording */}
-                    <div>
-                      <div className="label mb-2">语音样本录制 [10秒]</div>
-                      {voiceSampleBlob ? (
-                        <div className="flex items-center gap-3">
-                          <audio src={URL.createObjectURL(voiceSampleBlob)} controls className="flex-1 h-8" />
-                          <button 
-                            onClick={() => setVoiceSampleBlob(null)}
-                            className="data text-data-bad hover:text-red-300 transition-colors"
-                          >
-                            CLEAR
-                          </button>
-                        </div>
-                      ) : (
-                        <button 
-                          onClick={isSampleRecording ? stopSampleRecording : startSampleRecording}
-                          className={`btn w-full py-3 border text-xs font-mono tracking-wider transition-all ${
-                            isSampleRecording
-                              ? 'border-data-bad/30 bg-data-bad/5 text-data-bad'
-                              : 'border-border bg-surface/50 text-slate-400 hover:border-surface-light'
-                          }`}
-                        >
-                          {isSampleRecording ? 'STOP RECORDING' : 'START RECORDING'}
-                        </button>
-                      )}
-                    </div>
+            {/* Sample Recording */}
+            <div>
+              <SectionLabel>语音样本录制 [10秒]</SectionLabel>
+              {voiceSampleBlob ? (
+                <div className="flex items-center gap-3 mt-2">
+                  <audio src={URL.createObjectURL(voiceSampleBlob)} controls className="flex-1 h-8" />
+                  <Button variant="danger" size="sm" onClick={() => setVoiceSampleBlob(null)}>CLEAR</Button>
+                </div>
+              ) : (
+                <Button
+                  variant={isSampleRecording ? 'danger' : 'secondary'}
+                  size="lg"
+                  onClick={isSampleRecording ? stopSampleRecording : startSampleRecording}
+                  className="w-full mt-2 font-mono tracking-wider"
+                >
+                  {isSampleRecording ? 'STOP RECORDING' : 'START RECORDING'}
+                </Button>
+              )}
+            </div>
             
-                    {/* Text Input */}
-                    <div>
-                      <div className="label mb-2">朗读文本</div>
-                      <textarea
-                        value={cloneText}
-                        onChange={(e) => setCloneText(e.target.value)}
-                        placeholder={message || "输入要朗读的文字..."}
-                        maxLength={500}
-                        rows={3}
-                        className="w-full px-3 py-2 bg-surface border border-border text-white placeholder-slate-600 focus:outline-none focus:border-signal transition-colors resize-none text-sm"
-                      />
-                    </div>
+            {/* Text Input */}
+            <div>
+              <SectionLabel>朗读文本</SectionLabel>
+              <textarea
+                value={cloneText}
+                onChange={(e) => setCloneText(e.target.value)}
+                placeholder={message || "输入要朗读的文字..."}
+                maxLength={500}
+                rows={3}
+                className="mt-2 w-full px-3 py-2 bg-surface border border-border rounded-[var(--radius-md)] text-white placeholder-slate-600 focus:outline-none focus:border-signal transition-colors resize-none text-sm"
+              />
+            </div>
             
-                    {/* Generate Button */}
-                    <button
-                      onClick={handleVoiceClone}
-                      disabled={!voiceSampleBlob || isCloning}
-                      className={`btn w-full py-2.5 text-xs font-mono tracking-wider border transition-all ${
-                        voiceSampleBlob && !isCloning
-                          ? 'border-primary/40 bg-primary/5 text-primary-light hover:bg-primary/10'
-                          : 'border-border text-slate-600 cursor-not-allowed'
-                      }`}
-                    >
-                      {isCloning ? 'GENERATING...' : 'GENERATE CLONED VOICE'}
-                    </button>
+            {/* Generate Button */}
+            <Button
+              variant="primary"
+              size="md"
+              onClick={handleVoiceClone}
+              disabled={!voiceSampleBlob || isCloning}
+              loading={isCloning}
+              className="w-full font-mono tracking-wider"
+            >
+              GENERATE CLONED VOICE
+            </Button>
             
-                    {/* Preview */}
-                    {voiceCloneUrl && (
-                      <div className="pt-2 border-t border-border">
-                        <div className="label mb-2">预览</div>
-                        <audio src={voiceCloneUrl} controls className="w-full" />
-                      </div>
-                    )}
+            {/* Preview */}
+            {voiceCloneUrl && (
+              <div className="pt-2 border-t border-border">
+                <SectionLabel>预览</SectionLabel>
+                <audio src={voiceCloneUrl} controls className="w-full mt-2" />
+              </div>
+            )}
             
-                    {/* Error */}
-                    {error && !message.includes(error) && (
-                      <p className="data text-data-bad text-center">{error}</p>
-                    )}
-                  </div>
-                </section>
+            {/* Error */}
+            {error && !message.includes(error) && (
+              <p className="text-xs font-mono text-data-bad text-center">{error}</p>
+            )}
+          </Card>
+        </section>
 
         {/* MOOD TAGS */}
         <section>
-          <div className="label mb-2 flex items-center justify-between">
-            <span className="flex items-center gap-2">
-              <span className="inline-block w-2 h-px bg-signal-dim" />
-              EMOTION_TAGS
-            </span>
-            <span className="data">{moodTags.length}/3</span>
+          <div className="flex items-center justify-between mb-2">
+            <SectionLabel>EMOTION_TAGS</SectionLabel>
+            <span className="text-xs font-mono text-text-tertiary">{moodTags.length}/3</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
             {EMOTION_TAGS.map((tag) => {
               const sel = moodTags.includes(tag)
               return (
-                <button key={tag} onClick={() => toggleMoodTag(tag)}
-                  className={`btn px-2.5 py-1 text-xs font-mono border transition-all ${
-                    sel ? 'border-primary/40 bg-primary/5 text-primary-light' : 'border-border text-slate-500 hover:text-slate-300'
-                  }`}>
+                <Button
+                  key={tag}
+                  variant={sel ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => toggleMoodTag(tag)}
+                  className={`font-mono ${sel ? '' : 'border border-border'}`}
+                >
                   {tag}
-                </button>
+                </Button>
               )
             })}
           </div>
@@ -368,14 +329,10 @@ export default function CreatePage() {
 
         {/* TIME LOCK */}
         <section>
-          <div className="label mb-2 flex items-center gap-2">
-            <span className="inline-block w-2 h-px bg-signal-dim" />
-            TIME_LOCK
-          </div>
-          <div className="panel p-4 space-y-4">
-            {/* Toggle switch */}
+          <SectionLabel>TIME_LOCK</SectionLabel>
+          <Card variant="default" padding="md" className="mt-2 space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-slate-300">设置开启时间</span>
+              <span className="text-sm text-text-primary">设置开启时间</span>
               <button
                 onClick={() => setUseTimeLock(!useTimeLock)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
@@ -390,10 +347,9 @@ export default function CreatePage() {
               </button>
             </div>
 
-            {/* DateTime picker */}
             {useTimeLock && (
               <div className="pt-2 border-t border-border">
-                <label className="block text-xs font-mono text-slate-500 mb-2">
+                <label className="block text-xs font-mono text-text-tertiary mb-2">
                   解锁时间 (至少明天)
                 </label>
                 <input
@@ -401,56 +357,54 @@ export default function CreatePage() {
                   value={unlockAt}
                   onChange={(e) => setUnlockAt(e.target.value)}
                   min={getMinUnlockTime()}
-                  className="w-full px-3 py-2 bg-surface border border-border text-white focus:outline-none focus:border-signal transition-colors text-sm"
+                  className="w-full px-3 py-2 bg-surface border border-border rounded-[var(--radius-md)] text-white focus:outline-none focus:border-signal transition-colors text-sm"
                 />
-                <p className="mt-2 text-xs text-slate-500">
+                <p className="mt-2 text-xs text-text-muted">
                   胶囊将在设定的时间自动解锁，之前无法查看内容
                 </p>
               </div>
             )}
-          </div>
+          </Card>
         </section>
 
         {/* VISIBILITY */}
         <section>
-          <div className="label mb-2 flex items-center gap-2">
-            <span className="inline-block w-2 h-px bg-signal-dim" />
-            ACCESS_LEVEL
-          </div>
-          <div className="flex gap-1.5">
+          <SectionLabel>ACCESS_LEVEL</SectionLabel>
+          <div className="flex gap-1.5 mt-2">
             {([
               { value: 'public' as const, label: 'PUBLIC' },
               { value: 'private' as const, label: 'PRIVATE' },
               { value: 'link_only' as const, label: 'LINK ONLY' },
             ]).map((opt) => (
-              <button key={opt.value} onClick={() => setVisibility(opt.value)}
-                className={`btn flex-1 py-2.5 text-[10px] font-mono tracking-wider border transition-all ${
-                  visibility === opt.value
-                    ? 'border-signal/40 bg-signal/5 text-signal'
-                    : 'border-border text-slate-500'
-                }`}>
+              <Button
+                key={opt.value}
+                variant={visibility === opt.value ? 'primary' : 'ghost'}
+                size="sm"
+                onClick={() => setVisibility(opt.value)}
+                className={`flex-1 font-mono tracking-wider ${visibility === opt.value ? '' : 'border border-border'}`}
+              >
                 {opt.label}
-              </button>
+              </Button>
             ))}
           </div>
         </section>
 
         {/* ERROR */}
-        {error && <p className="data text-data-bad text-center">{error}</p>}
+        {error && <p className="text-xs font-mono text-data-bad text-center">{error}</p>}
 
         {/* DEPLOY */}
-        <div className="divider mb-4" />
-        <button
+        <div className="border-t border-border-subtle my-4" />
+        <Button
+          variant="capsule"
+          size="lg"
           onClick={handleSubmit}
           disabled={!canSubmit || isSubmitting}
-          className={`btn w-full py-4 text-xs font-mono tracking-widest border transition-all ${
-            canSubmit && !isSubmitting
-              ? 'border-capsule/40 bg-capsule/5 text-capsule hover:bg-capsule/10'
-              : 'border-border text-slate-600 cursor-not-allowed'
-          }`}>
-          {isSubmitting ? 'DEPLOYING...' : 'DEPLOY CAPSULE'}
-        </button>
+          loading={isSubmitting}
+          className="w-full font-mono tracking-widest"
+        >
+          DEPLOY CAPSULE
+        </Button>
       </div>
-    </div>
+    </PageShell>
   )
 }

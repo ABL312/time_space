@@ -4,7 +4,7 @@ import Button from './Button'
 
 interface PageShellProps {
   title?: string
-  backTo?: string
+  backTo?: string | number
   backLabel?: string
   actions?: ReactNode
   children: ReactNode
