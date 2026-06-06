@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUserStore } from '../stores/userStore'
 import { useOnline } from '../hooks/useOnline'
-import { capsulesApi } from '../lib/api'
+import { ApiError, capsulesApi } from '../lib/api'
 import { PageShell, Card, Badge, LoadingState, EmptyState, ErrorState } from '../components/ui'
 import type { Capsule } from '../types'
 
@@ -21,7 +21,14 @@ export default function MyCapsulesPage() {
     capsulesApi
       .getMine(user.id)
       .then((res) => { if (!cancelled) setCapsules(res.capsules) })
-      .catch((err) => { if (!cancelled) setError(err.message) })
+      .catch((err) => {
+        if (cancelled) return
+        if (err instanceof ApiError && err.status === 404) {
+          setCapsules([])
+          return
+        }
+        setError(err.message)
+      })
       .finally(() => { if (!cancelled) setIsLoading(false) })
     return () => { cancelled = true }
   }, [user])
@@ -32,7 +39,13 @@ export default function MyCapsulesPage() {
       setIsLoading(true)
       capsulesApi.getMine(user.id)
         .then((r) => setCapsules(r.capsules))
-        .catch((err) => setError(err.message))
+        .catch((err) => {
+          if (err instanceof ApiError && err.status === 404) {
+            setCapsules([])
+            return
+          }
+          setError(err.message)
+        })
         .finally(() => setIsLoading(false))
     }
   }
@@ -82,7 +95,7 @@ export default function MyCapsulesPage() {
           <EmptyState
             icon={<div className="w-3 h-3 bg-slate-600" />}
             title="NO CAPSULES DEPLOYED"
-            description="You haven't created any time capsules yet"
+            description="你创建的胶囊会显示在这里；后端接口接入前会暂时显示为空"
             action={{ label: '+ DEPLOY FIRST CAPSULE', onClick: () => navigate('/create') }}
           />
         )}

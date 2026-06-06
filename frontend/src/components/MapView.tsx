@@ -13,6 +13,19 @@ declare module 'leaflet' {
   ): L.Layer
 }
 
+function createBaseTileLayer() {
+  return L.tileLayer('https://rt{s}.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=1&version=297', {
+    attribution: '&copy; 腾讯地图',
+    subdomains: '0123',
+    maxZoom: 18,
+    tms: true,
+    keepBuffer: 4,
+    updateWhenIdle: true,
+    updateWhenZooming: false,
+    crossOrigin: true,
+  })
+}
+
 interface MapViewProps {
   latitude: number
   longitude: number
@@ -32,6 +45,16 @@ export default function MapView({
   const heatLayerRef = useRef<L.Layer | null>(null)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
   const [showHeatmap, setShowHeatmap] = useState(false)
+  const [tilesLoaded, setTilesLoaded] = useState(false)
+  const [tileError, setTileError] = useState(false)
+
+  const recenterToUser = () => {
+    if (!map.current) return
+    map.current.flyTo([latitude, longitude], Math.max(map.current.getZoom(), 15), {
+      duration: 0.8,
+      easeLinearity: 0.25,
+    })
+  }
 
   // Initialize map
   useEffect(() => {
@@ -57,12 +80,15 @@ export default function MapView({
       })
       console.log('[MapView] Map created:', !!map.current)
 
-      // 高德地图瓦片 — 国内快速访问
-      tileLayerRef.current = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
-        attribution: '&copy; 高德地图',
-        subdomains: '1234',
-        maxZoom: 18,
-      }).addTo(map.current)
+      // 腾讯地图瓦片 — 高德 webrd 在当前环境返回空瓦片，腾讯源能稳定返回真实底图。
+      tileLayerRef.current = createBaseTileLayer().addTo(map.current)
+      tileLayerRef.current.on('load', () => {
+        setTilesLoaded(true)
+        setTileError(false)
+      })
+      tileLayerRef.current.on('tileerror', () => {
+        setTileError(true)
+      })
       console.log('[MapView] Tile layer added')
 
       // Zoom control top-right
@@ -96,49 +122,13 @@ export default function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Update map style based on theme
+  // Keep map size in sync with layout changes.
   useEffect(() => {
-    const updateMapStyle = () => {
-      const theme = document.documentElement.dataset.theme || 'night'
-      
-      if (tileLayerRef.current && map.current) {
-        // Remove existing tile layer
-        tileLayerRef.current.removeFrom(map.current)
-        
-        // Add new tile layer based on theme
-        if (theme === 'morning') {
-          tileLayerRef.current = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=7&x={x}&y={y}&z={z}', {
-            attribution: '&copy; 高德地图',
-            subdomains: '1234',
-            maxZoom: 18,
-          }).addTo(map.current)
-        } else if (theme === 'afternoon') {
-          tileLayerRef.current = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
-            attribution: '&copy; 高德地图',
-            subdomains: '1234',
-            maxZoom: 18,
-          }).addTo(map.current)
-        } else if (theme === 'evening') {
-          tileLayerRef.current = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=6&x={x}&y={y}&z={z}', {
-            attribution: '&copy; 高德地图',
-            subdomains: '1234',
-            maxZoom: 18,
-          }).addTo(map.current)
-        } else {
-          // night theme (default)
-          tileLayerRef.current = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
-            attribution: '&copy; 高德地图',
-            subdomains: '1234',
-            maxZoom: 18,
-          }).addTo(map.current)
-        }
-      }
+    const invalidateMapSize = () => {
+      map.current?.invalidateSize({ pan: false })
     }
 
-    updateMapStyle()
-    
-    // Listen for theme changes
-    const observer = new MutationObserver(updateMapStyle)
+    const observer = new MutationObserver(invalidateMapSize)
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['data-theme']
@@ -228,7 +218,19 @@ export default function MapView({
   }, [capsules, latitude, longitude, onCapsuleClick, showHeatmap])
 
   return (
-    <div ref={mapContainer} className="absolute inset-0 w-full h-full" role="application" aria-label="Interactive map">
+    <div className="absolute inset-0 w-full h-full bg-void">
+      {!tilesLoaded && (
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,211,238,0.12),transparent_45%),linear-gradient(rgba(34,211,238,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.08)_1px,transparent_1px)] bg-[size:100%_100%,48px_48px,48px_48px]" />
+      )}
+      <div ref={mapContainer} className="absolute inset-0 w-full h-full" role="application" aria-label="Interactive map" />
+      {!tilesLoaded && (
+        <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+          <div className="hud px-3 py-2 text-center">
+            <div className="data-value text-xs">MAP SIGNAL</div>
+            <div className="data mt-1">{tileError ? '瓦片加载失败，显示备用网格' : '正在加载地图瓦片...'}</div>
+          </div>
+        </div>
+      )}
       {/* Heatmap Toggle Button */}
       <div className="absolute top-20 right-3 z-[1000]">
         <Button
@@ -250,6 +252,21 @@ export default function MapView({
           <span className="text-xs font-mono tracking-wider">
             {showHeatmap ? 'HEAT ON' : 'HEAT OFF'}
           </span>
+        </Button>
+      </div>
+      <div className="absolute top-32 right-3 z-[1000]">
+        <Button
+          variant="icon"
+          size="icon-md"
+          onClick={recenterToUser}
+          className="hud text-signal hover:text-white min-h-[44px]"
+          title="回到当前位置"
+          aria-label="Recenter map to current location"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
+          </svg>
         </Button>
       </div>
     </div>

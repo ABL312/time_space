@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { favoritesApi, getErrorMessage } from '../lib/api'
+import { ApiError, favoritesApi, getErrorMessage } from '../lib/api'
 import { useUserStore } from '../stores/userStore'
 import type { FavoriteCapsule } from '../types'
 import { PageShell, Card, Badge, LoadingState, EmptyState, ErrorState } from '../components/ui'
@@ -22,6 +22,10 @@ export default function FavoritesPage() {
         const data = await favoritesApi.list(user.id)
         setFavorites(data)
       } catch (err: unknown) {
+        if (err instanceof ApiError && err.status === 404) {
+          setFavorites([])
+          return
+        }
         setError(getErrorMessage(err, '获取收藏失败'))
       } finally {
         setIsLoading(false)
@@ -79,7 +83,7 @@ export default function FavoritesPage() {
               </svg>
             }
             title="暂无收藏"
-            description="浏览胶囊时点击收藏按钮，会出现在这里"
+            description="收藏功能正在接入后端；浏览胶囊时点击收藏后会出现在这里"
             action={{ label: '去发现胶囊', onClick: () => navigate('/') }}
           />
         ) : (

@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUserStore } from '../stores/userStore'
-import { profileApi } from '../lib/api'
+import { ApiError, profileApi } from '../lib/api'
 import type { Capsule } from '../types'
-import AchievementPanel from '../components/AchievementPanel'
 import { useAchievements } from '../hooks/useAchievements'
 import { PageShell, Card, Badge, LoadingState, EmptyState, ErrorState, SectionLabel } from '../components/ui'
 
@@ -70,6 +69,18 @@ export default function ProfilePage() {
         setLoading(false)
       })
       .catch((err) => {
+        if (err instanceof ApiError && err.status === 404) {
+          setStats({
+            created_count: 0,
+            opened_count: 0,
+            favorited_count: 0,
+            total_capsules: 0,
+            recent_opened: [],
+            recent_created: [],
+          })
+          setLoading(false)
+          return
+        }
         setError(err?.message || '加载失败')
         setLoading(false)
       })
@@ -139,7 +150,19 @@ export default function ProfilePage() {
             <span className="inline-block w-2 h-px bg-signal-dim" />
             成就徽章
           </SectionLabel>
-          <AchievementPanel achievements={achievements} isOpen={true} onClose={() => {}} />
+          <div className="grid grid-cols-2 gap-2">
+            {achievements.slice(0, 4).map((achievement) => (
+              <Card key={achievement.id} variant="default" padding="sm">
+                <div className="flex items-center gap-2">
+                  <span className={`text-lg ${achievement.unlocked ? '' : 'grayscale opacity-50'}`}>{achievement.icon}</span>
+                  <div className="min-w-0">
+                    <p className="text-xs text-text-primary truncate">{achievement.title}</p>
+                    <p className="data text-[10px]">{achievement.progress}/{achievement.target}</p>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
         </section>
 
         {/* Recent Opened */}

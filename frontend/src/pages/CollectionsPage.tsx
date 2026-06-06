@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { collectionsApi } from '../lib/api'
+import { ApiError, collectionsApi } from '../lib/api'
 import type { CapsuleCollection } from '../types'
 import { PageShell, Card, Badge, LoadingState, EmptyState, ErrorState } from '../components/ui'
 
@@ -17,6 +17,11 @@ export default function CollectionsPage() {
         setLoading(false)
       })
       .catch((err) => {
+        if (err instanceof ApiError && err.status === 404) {
+          setCollections([])
+          setLoading(false)
+          return
+        }
         setError(err?.message || '加载失败')
         setLoading(false)
       })
@@ -37,7 +42,7 @@ export default function CollectionsPage() {
               </svg>
             }
             title="暂无合集"
-            description="创建合集来组织你收藏的胶囊"
+            description="合集功能正在接入后端，稍后可以用来组织你收藏的胶囊"
           />
         ) : (
           <div className="space-y-3 stagger">
