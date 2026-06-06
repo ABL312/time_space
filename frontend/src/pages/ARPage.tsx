@@ -4,6 +4,8 @@ import { useGeolocation } from '../hooks/useGeolocation'
 import { useOrientation } from '../hooks/useOrientation'
 import { useCapsuleStore } from '../stores/capsuleStore'
 import { useCapabilityCheck } from '../hooks/useCapabilityCheck'
+import { useOnline } from '../hooks/useOnline'
+import { Badge } from '../components/ui'
 import ARScene from '../components/ARScene'
 
 export default function ARPage() {
@@ -13,6 +15,7 @@ export default function ARPage() {
   const orientation = useOrientation()
   const { nearby, fetchNearby } = useCapsuleStore()
   const cap = useCapabilityCheck()
+  const { isOnline } = useOnline()
   const [cameraReady, setCameraReady] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
 
@@ -64,6 +67,13 @@ export default function ARPage() {
              'RENDERER OFFLINE — LIST VIEW ACTIVE'}
           </span>
         </div>
+
+        {/* Offline banner */}
+        {!isOnline && (
+          <div className="mx-4 mt-2 p-2.5 hud border-data-bad/20 flex items-center gap-2">
+            <Badge variant="error" dot>OFFLINE — SCANNING CACHED DATA</Badge>
+          </div>
+        )}
 
         {/* Capsule scan results */}
         <div className="px-4 py-4">
@@ -154,16 +164,19 @@ export default function ARPage() {
 
       {/* HUD Top */}
       <div className="absolute top-0 left-0 right-0 p-3 flex justify-between items-start z-20">
-        <button onClick={() => navigate('/')} className="btn hud px-3 py-2 text-xs font-mono tracking-wider text-slate-300">
+        <button onClick={() => navigate('/')} className="btn hud px-3 py-2 text-xs font-mono tracking-wider text-slate-300 min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label="Return to map">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
         </button>
-        <div className="hud px-3 py-2 flex items-center gap-2">
-          <div className="w-1.5 h-1.5 bg-signal breathe" />
-          <span className="data-value text-xs font-mono">
-            {orientation.alpha != null ? `${Math.round(orientation.alpha)}°` : '---'}
-          </span>
+        <div className="flex items-center gap-2">
+          {!isOnline && <Badge variant="error" dot className="animate-pulse">OFFLINE</Badge>}
+          <div className="hud px-3 py-2 flex items-center gap-2">
+            <div className="w-1.5 h-1.5 bg-signal breathe" />
+            <span className="data-value text-xs font-mono">
+              {orientation.alpha != null ? `${Math.round(orientation.alpha)}°` : '---'}
+            </span>
+          </div>
         </div>
       </div>
 

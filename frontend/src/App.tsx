@@ -3,6 +3,7 @@ import { useEffect, lazy, Suspense } from 'react'
 import { useUserStore } from './stores/userStore'
 import { useTimeTheme } from './hooks/useTimeTheme'
 import LoadingState from './components/ui/LoadingState'
+import OfflineBanner from './components/ui/OfflineBanner'
 
 // Lazy-loaded pages for code splitting
 const HomePage = lazy(() => import('./pages/HomePage'))
@@ -38,6 +39,15 @@ function App() {
     loadUser()
   }, [loadUser])
 
+  // Register service worker for PWA support
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {
+        // SW registration failure is non-critical
+      })
+    }
+  }, [])
+
   if (isLoading) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-bg">
@@ -51,7 +61,10 @@ function App() {
 
   return (
     <BrowserRouter>
+      <a href="#main-content" className="skip-link">Skip to content</a>
+      <OfflineBanner />
       <Suspense fallback={<PageLoader />}>
+        <main id="main-content">
         <Routes>
           <Route
             path="/onboarding"
@@ -99,6 +112,7 @@ function App() {
           />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        </main>
       </Suspense>
     </BrowserRouter>
   )

@@ -13,7 +13,7 @@ import ProximityAlert from '../components/ProximityAlert'
 import { useAchievements } from '../hooks/useAchievements'
 import AchievementPanel from '../components/AchievementPanel'
 import DanmakuLayer from '../components/DanmakuLayer'
-import { Card, Badge, Button, Input } from '../components/ui'
+import { Card, Badge, Button, Input, BottomSheet } from '../components/ui'
 import type { Capsule } from '../types'
 
 export default function HomePage() {
@@ -35,6 +35,7 @@ export default function HomePage() {
   const [isSearching, setIsSearching] = useState(false)
   const [searchError, setSearchError] = useState<string | null>(null)
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
   
   const effectiveLatitude = virtualLocation?.lat ?? latitude ?? 31.0282
   const effectiveLongitude = virtualLocation?.lng ?? longitude ?? 121.4346
@@ -315,36 +316,45 @@ export default function HomePage() {
             <span className="text-xs font-mono text-signal">SCANNING</span>
           </Card>
         )}
-        <Button variant="icon" size="icon-md" onClick={() => navigate('/profile')} title="个人主页" className="hud">
-          <div className="w-5 h-5 border border-signal-dim/30 flex items-center justify-center bg-signal/5 rounded">
-            <span className="text-xs font-semibold text-signal font-mono">
-              {user?.name?.charAt(0)?.toUpperCase() || '?'}
-            </span>
-          </div>
-        </Button>
-        <Button variant="icon" size="icon-md" onClick={() => navigate('/collections')} title="胶囊合集" className="hud text-slate-400 hover:text-purple-400">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-          </svg>
-        </Button>
-        <Button variant="icon" size="icon-md" onClick={() => navigate('/favorites')} title="我的收藏" className="hud text-slate-400 hover:text-red-400">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
-          </svg>
-        </Button>
-        <Button variant="icon" size="icon-md" onClick={() => setIsAchievementPanelOpen(true)} title="成就系统" className="hud text-slate-400 hover:text-yellow-300">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
-          </svg>
-        </Button>
-        <Button variant="icon" size="icon-md" onClick={() => navigate('/mine')} title="我的胶囊" className="hud text-slate-400 hover:text-capsule">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-          </svg>
-        </Button>
-        <Button variant="icon" size="icon-md" onClick={clearUser} title={`退出 ${user?.name || ''}`} className="hud text-slate-400 hover:text-signal">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+        {/* Desktop: show all buttons; Mobile: show hamburger */}
+        <div className="hidden sm:flex items-center gap-2">
+          <Button variant="icon" size="icon-md" onClick={() => navigate('/profile')} title="个人主页" className="hud">
+            <div className="w-5 h-5 border border-signal-dim/30 flex items-center justify-center bg-signal/5 rounded">
+              <span className="text-xs font-semibold text-signal font-mono">
+                {user?.name?.charAt(0)?.toUpperCase() || '?'}
+              </span>
+            </div>
+          </Button>
+          <Button variant="icon" size="icon-md" onClick={() => navigate('/collections')} title="胶囊合集" className="hud text-slate-400 hover:text-purple-400">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+            </svg>
+          </Button>
+          <Button variant="icon" size="icon-md" onClick={() => navigate('/favorites')} title="我的收藏" className="hud text-slate-400 hover:text-red-400">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
+            </svg>
+          </Button>
+          <Button variant="icon" size="icon-md" onClick={() => setIsAchievementPanelOpen(true)} title="成就系统" className="hud text-slate-400 hover:text-yellow-300">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.563.563 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+            </svg>
+          </Button>
+          <Button variant="icon" size="icon-md" onClick={() => navigate('/mine')} title="我的胶囊" className="hud text-slate-400 hover:text-capsule">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+            </svg>
+          </Button>
+          <Button variant="icon" size="icon-md" onClick={clearUser} title={`退出 ${user?.name || ''}`} className="hud text-slate-400 hover:text-signal">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+            </svg>
+          </Button>
+        </div>
+        {/* Mobile hamburger */}
+        <Button variant="icon" size="icon-md" onClick={() => setIsMenuOpen(true)} title="菜单" className="hud sm:hidden">
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
           </svg>
         </Button>
       </div>
@@ -418,6 +428,39 @@ export default function HomePage() {
         isOpen={isAchievementPanelOpen} 
         onClose={() => setIsAchievementPanelOpen(false)} 
       />
+
+      {/* ── MOBILE NAV MENU (BottomSheet) ── */}
+      <BottomSheet isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} title="NAVIGATION">
+        <div className="grid grid-cols-2 gap-2">
+          {[
+            { label: '个人主页', path: '/profile', color: 'text-signal', icon: user?.name?.charAt(0)?.toUpperCase() || '?' },
+            { label: '胶囊合集', path: '/collections', color: 'text-purple-400', icon: '📚' },
+            { label: '我的收藏', path: '/favorites', color: 'text-red-400', icon: '♥' },
+            { label: '成就系统', action: () => { setIsMenuOpen(false); setIsAchievementPanelOpen(true) }, color: 'text-yellow-300', icon: '★' },
+            { label: '我的胶囊', path: '/mine', color: 'text-capsule', icon: '✉' },
+          ].map((item) => (
+            <button
+              key={item.label}
+              onClick={() => {
+                if (item.action) { item.action(); return }
+                setIsMenuOpen(false)
+                if (item.path) navigate(item.path)
+              }}
+              className="flex flex-col items-center gap-2 p-4 rounded-[var(--radius-md)] border border-border hover:border-border-active hover:bg-surface-light/10 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-signal/50"
+            >
+              <span className={`text-lg ${item.color}`}>{item.icon}</span>
+              <span className="text-xs font-mono tracking-wider text-text-secondary">{item.label}</span>
+            </button>
+          ))}
+          <button
+            onClick={() => { setIsMenuOpen(false); clearUser() }}
+            className="flex flex-col items-center gap-2 p-4 rounded-[var(--radius-md)] border border-data-bad/20 hover:bg-data-bad/5 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-signal/50"
+          >
+            <span className="text-lg text-data-bad">⏻</span>
+            <span className="text-xs font-mono tracking-wider text-data-bad">退出登录</span>
+          </button>
+        </div>
+      </BottomSheet>
     </div>
   )
 }
