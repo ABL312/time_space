@@ -56,6 +56,12 @@ func (s *Server) Start() error {
 	mux.HandleFunc("POST /api/upload/photo", handlers.UploadPhoto(s.config))
 	mux.HandleFunc("POST /api/upload/voice", handlers.UploadVoice(s.config))
 
+	// AI endpoints (all use fallback, no external API dependency)
+	mux.HandleFunc("POST /api/ai/analyze-emotion", handlers.AnalyzeEmotion)
+	mux.HandleFunc("GET /api/ai/location-context", handlers.LocationContext)
+	mux.HandleFunc("POST /api/ai/scene", handlers.AnalyzeScene)
+	mux.HandleFunc("POST /api/ai/voice-clone", handlers.VoiceClone)
+
 	// Serve static files from uploads directory
 	fs := http.FileServer(http.Dir(s.config.UploadDir))
 	mux.Handle("/uploads/", http.StripPrefix("/uploads/", fs))

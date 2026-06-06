@@ -27,6 +27,10 @@
 | `POST` | `/api/upload/photo` | 上传照片 (multipart) |
 | `POST` | `/api/upload/voice` | 上传语音 (multipart) |
 | `GET`  | `/uploads/*` | 静态文件访问 |
+| `POST` | `/api/ai/analyze-emotion` | 情感分析 (关键词 fallback) |
+| `GET` | `/api/ai/location-context` | 位置上下文 |
+| `POST` | `/api/ai/scene` | 场景识别 (fallback) |
+| `POST` | `/api/ai/voice-clone` | 语音克隆 (fallback) |
 
 ---
 
@@ -222,6 +226,54 @@ curl -F "file=@recording.webm;type=audio/webm" http://localhost:8002/api/upload/
 
 # 访问上传的文件
 curl -I http://localhost:8002/uploads/photos/uuid.jpg
+```
+
+---
+
+## AI API (全部支持 fallback，无需 API key)
+
+所有 AI 端点不依赖外部 API key，始终返回 200。若未来接入 GPT/ElevenLabs，fallback 作为超时/失败的兜底。
+
+### `POST /api/ai/analyze-emotion`
+- 请求体 (JSON): `{"message": "想你了，好想你"}`
+- 策略: 中文关键词匹配 → 标签打分 → 情感分类
+- 支持 16 种情感标签: 怀旧/温暖/感恩/浪漫/思念/快乐/遗憾/鼓励/幽默/神秘/孤独/希望/青春/友情/亲情/爱情
+- 响应 200:
+  ```json
+  {"emotions":["思念","温暖"],"sentiment":"neutral","intensity":0.6,"summary":"包含思念、温暖情感的留言"}
+  ```
+- 无匹配时返回默认: `{"emotions":["温暖","希望"],"sentiment":"positive","intensity":0.3}`
+- 错误: 400 `"message is required"`
+
+### `GET /api/ai/location-context?lat=31.23&lng=121.47`
+- 策略: 坐标象限推断 (无 Nominatim 依赖)
+- 响应 200:
+  ```json
+  {"name":"中国东部城区","description":"繁华的东部沿海地区...","nearby_capsule_count":0,"suggested_moods":["怀旧","希望","温暖"]}
+  ```
+
+### `POST /api/ai/scene`
+- 请求: multipart/form-data (image) 或 JSON
+- 策略: 始终返回 fallback (无 GPT Vision)
+- 响应 200:
+  ```json
+  {"scene_type":"未知","description":"场景识别暂时不可用...","atmosphere":"神秘而有趣","mood_match":["温暖","希望"]}
+  ```
+
+### `POST /api/ai/voice-clone`
+- 请求: multipart/form-data (sample + text) 或 JSON
+- 策略: 始终返回 fallback (无 ElevenLabs)
+- 响应 200:
+  ```json
+  {"voice_id":"fallback","audio_url":"/uploads/voice_clones/fallback.mp3","duration_seconds":3.0}
+  ```
+
+### curl 示例
+```bash
+curl -X POST http://localhost:8002/api/ai/analyze-emotion -H 'Content-Type: application/json' -d '{"message":"想你了"}'
+curl "http://localhost:8002/api/ai/location-context?lat=31.23&lng=121.47"
+curl -X POST http://localhost:8002/api/ai/scene
+curl -X POST http://localhost:8002/api/ai/voice-clone
 ```
 
 ---

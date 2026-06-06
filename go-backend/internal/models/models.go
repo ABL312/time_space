@@ -154,6 +154,28 @@ type MediaResponse struct {
 	SortOrder    int     `json:"sort_order"`
 }
 
+// ── AI models ───────────────────────────────────────────────────
+
+type EmotionAnalysisResponse struct {
+	Emotions  []string `json:"emotions"`
+	Sentiment string   `json:"sentiment"`
+	Intensity float64  `json:"intensity"`
+	Summary   string   `json:"summary"`
+}
+
+type SceneResponse struct {
+	SceneType   string   `json:"scene_type"`
+	Description string   `json:"description"`
+	Atmosphere  string   `json:"atmosphere"`
+	MoodMatch   []string `json:"mood_match"`
+}
+
+type VoiceCloneResponse struct {
+	VoiceID         string  `json:"voice_id"`
+	AudioURL        string  `json:"audio_url"`
+	DurationSeconds float64 `json:"duration_seconds"`
+}
+
 // ── Internal helpers ────────────────────────────────────────────
 
 // FormatTime formats a time.Time to ISO 8601 string, or empty if zero
