@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { capsulesApi } from '../lib/api'
 import type { NearbyResponse } from '../types'
 

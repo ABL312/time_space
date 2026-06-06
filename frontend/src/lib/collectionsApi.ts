@@ -8,7 +8,7 @@ export interface CollectionWithCapsules extends CapsuleCollection {
 /** Collections API - capsule groups */
 export const collectionsApi = {
   /** List all collections */
-  list(): Promise<CapsuleCollection[]> {
+  list(): Promise<{ collections: CapsuleCollection[]; total: number }> {
     return request('/collections')
   },
 

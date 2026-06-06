@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { usersApi } from '../lib/usersApi'
 import type { User } from '../types'
 
 interface UserState {
@@ -48,16 +49,11 @@ export const useUserStore = create<UserState>((set) => ({
 
     set({ isLoading: true })
     try {
-      const res = await fetch(`/api/users/${userId}`)
-      if (res.ok) {
-        const user = await res.json()
-        set({ user, isLoading: false })
-      } else {
-        localStorage.removeItem(STORAGE_KEY)
-        set({ user: null, isLoading: false })
-      }
+      const user = await usersApi.getById(userId)
+      set({ user, isLoading: false })
     } catch {
-      set({ isLoading: false, error: 'Failed to load user' })
+      localStorage.removeItem(STORAGE_KEY)
+      set({ user: null, isLoading: false })
     }
   },
 

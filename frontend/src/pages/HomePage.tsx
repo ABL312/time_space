@@ -65,7 +65,7 @@ export default function HomePage() {
       }
       
       const results = await searchApi.search(params)
-      setSearchResults(results)
+      setSearchResults(results.capsules)
     } catch (err: unknown) {
       setSearchError(getErrorMessage(err, '搜索失败'))
       console.error('Search error:', err)
@@ -89,8 +89,8 @@ export default function HomePage() {
 
   useEffect(() => {
     dailyApi.getRecommend()
-      .then((data: Capsule) => {
-        setDailyRecommendation(data)
+      .then((data) => {
+        setDailyRecommendation(data.capsule)
       })
       .catch((err) => {
         console.error('Failed to fetch daily recommendation:', err)

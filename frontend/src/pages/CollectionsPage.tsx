@@ -12,8 +12,8 @@ export default function CollectionsPage() {
 
   useEffect(() => {
     collectionsApi.list()
-      .then((data: CapsuleCollection[]) => {
-        setCollections(data)
+      .then((data) => {
+        setCollections(data.collections)
         setLoading(false)
       })
       .catch((err) => {
