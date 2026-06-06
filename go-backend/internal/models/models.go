@@ -172,10 +172,3 @@ func FormatTimePtr(t *time.Time) *string {
 	s := t.UTC().Format(time.RFC3339)
 	return &s
 }
-
-// NullableTime returns *time.Time from sql.NullTime (Go 1.26 compatible)
-func NullableTime(t interface{}) *time.Time {
-	// sql.NullTime in Go 1.26 has Time and Valid fields
-	// We receive it as an interface for forward compat
-	return nil
-}

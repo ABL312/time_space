@@ -44,7 +44,9 @@ func HealthHandler(cfg *config.Config, database *sql.DB) http.HandlerFunc {
 			err := database.PingContext(ctx)
 			if err != nil {
 				dbStatus["status"] = "error"
-				dbStatus["error"] = err.Error()
+				if cfg.Environment == "development" {
+					dbStatus["error"] = err.Error()
+				}
 			} else {
 				dbStatus["status"] = "ok"
 			}
@@ -59,7 +61,9 @@ func HealthHandler(cfg *config.Config, database *sql.DB) http.HandlerFunc {
 			_, err := os.Stat(cfg.UploadDir)
 			if err != nil {
 				mediaStatus["status"] = "error"
-				mediaStatus["error"] = err.Error()
+				if cfg.Environment == "development" {
+					mediaStatus["error"] = err.Error()
+				}
 			} else {
 				mediaStatus["status"] = "ok"
 			}

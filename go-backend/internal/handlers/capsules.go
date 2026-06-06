@@ -1,11 +1,13 @@
 package handlers
 
 import (
+	"crypto/rand"
 	"database/sql"
 	"encoding/json"
 	"math"
-	"math/rand"
+	"math/big"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -141,12 +143,23 @@ func GetCapsule(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		// Increment open count
-		db.Exec("UPDATE capsules SET open_count = open_count + 1 WHERE id = ?", capsuleID)
-		// Record interaction
+		// Increment open count and record interaction in a transaction
+		tx, err := db.Begin()
+		if err != nil {
+			WriteError(w, http.StatusInternalServerError, "Transaction failed")
+			return
+		}
+		defer tx.Rollback()
+
+		tx.Exec("UPDATE capsules SET open_count = open_count + 1 WHERE id = ?", capsuleID)
 		interactionID := uuid.New().String()
-		db.Exec("INSERT INTO interactions (id, capsule_id, action) VALUES (?, ?, 'open')",
+		tx.Exec("INSERT INTO interactions (id, capsule_id, action) VALUES (?, ?, 'open')",
 			interactionID, capsuleID)
+
+		if err := tx.Commit(); err != nil {
+			WriteError(w, http.StatusInternalServerError, "Failed to record view")
+			return
+		}
 
 		// Re-query to get updated open_count
 		capsule = queryCapsule(db, capsuleID)
@@ -183,10 +196,22 @@ func GetCapsuleByShareToken(db *sql.DB) http.HandlerFunc {
 			}
 		}
 
-		db.Exec("UPDATE capsules SET open_count = open_count + 1 WHERE id = ?", capsule.ID)
+		tx, err := db.Begin()
+		if err != nil {
+			WriteError(w, http.StatusInternalServerError, "Transaction failed")
+			return
+		}
+		defer tx.Rollback()
+
+		tx.Exec("UPDATE capsules SET open_count = open_count + 1 WHERE id = ?", capsule.ID)
 		interactionID := uuid.New().String()
-		db.Exec("INSERT INTO interactions (id, capsule_id, action) VALUES (?, ?, 'open')",
+		tx.Exec("INSERT INTO interactions (id, capsule_id, action) VALUES (?, ?, 'open')",
 			interactionID, capsule.ID)
+
+		if err := tx.Commit(); err != nil {
+			WriteError(w, http.StatusInternalServerError, "Failed to record view")
+			return
+		}
 
 		capsule = queryCapsule(db, capsule.ID)
 		WriteJSON(w, http.StatusOK, capsule)
@@ -370,10 +395,8 @@ func GetNearby(db *sql.DB) http.HandlerFunc {
 			capsuleIDs[i] = c.ID
 		}
 		mediaMap := batchQueryMedia(db, capsuleIDs)
-		interactionMap := batchQueryInteractionCounts(db, capsuleIDs)
 		for i := range recommended {
 			recommended[i].Media = mediaMap[recommended[i].ID]
-			_ = interactionMap // reserved for future response fields
 		}
 		for i := range others {
 			others[i].Media = mediaMap[others[i].ID]
@@ -522,9 +545,7 @@ func SearchCapsules(db *sql.DB) http.HandlerFunc {
 func GetDailyRecommend(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		today := time.Now().UTC()
-		seed := int64(today.Year()*10000 + int(today.Month())*100 + today.Day())
-		rng := rand.New(rand.NewSource(seed))
-
+		seed := today.Year()*10000 + int(today.Month())*100 + today.Day()
 		currentTime := today.Format(time.RFC3339)
 
 		// Try highly rated first
@@ -577,7 +598,7 @@ func GetDailyRecommend(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		selected := capsules[rng.Intn(len(capsules))]
+		selected := capsules[seed%len(capsules)]
 
 		// Build reasons
 		var reasons []string
@@ -964,18 +985,6 @@ func scanFullCapsuleRow(row *sql.Row) *models.CapsuleResponse {
 
 // ── Utility ─────────────────────────────────────────────────────
 
-func extractCapsuleID(path string) string {
-	return extractPathParam(path, "/api/capsules/")
-}
-
-func extractPathParam(path, prefix string) string {
-	s := strings.TrimPrefix(path, prefix)
-	if idx := strings.Index(s, "/"); idx >= 0 {
-		s = s[:idx]
-	}
-	return s
-}
-
 // parsePagination extracts limit and offset from query params.
 // Supports both limit/offset and page/page_size.
 // Default limit, max limit are configurable.
@@ -1027,27 +1036,28 @@ func parsePagination(r *http.Request, defaultLimit, maxLimit int) (limit, offset
 func generateShareToken(length int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 	b := make([]byte, length)
+	charsetLen := big.NewInt(int64(len(charset)))
 	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
+		n, err := rand.Int(rand.Reader, charsetLen)
+		if err != nil {
+			// Fallback: use time-based random (should never happen)
+			n = big.NewInt(int64(time.Now().UnixNano() % int64(len(charset))))
+		}
+		b[i] = charset[n.Int64()]
 	}
 	return string(b)
 }
 
 func sortCapsulesByScore(capsules []models.CapsuleResponse) {
-	// Simple bubble sort by match_score descending
-	for i := 0; i < len(capsules); i++ {
-		for j := i + 1; j < len(capsules); j++ {
-			si := 0.0
-			if capsules[i].MatchScore != nil {
-				si = *capsules[i].MatchScore
-			}
-			sj := 0.0
-			if capsules[j].MatchScore != nil {
-				sj = *capsules[j].MatchScore
-			}
-			if sj > si {
-				capsules[i], capsules[j] = capsules[j], capsules[i]
-			}
+	sort.Slice(capsules, func(i, j int) bool {
+		si := 0.0
+		if capsules[i].MatchScore != nil {
+			si = *capsules[i].MatchScore
 		}
-	}
+		sj := 0.0
+		if capsules[j].MatchScore != nil {
+			sj = *capsules[j].MatchScore
+		}
+		return si > sj
+	})
 }
