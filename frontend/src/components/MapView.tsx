@@ -35,30 +35,62 @@ export default function MapView({
 
   // Initialize map
   useEffect(() => {
-    if (!mapContainer.current || map.current) return
+    console.log('[MapView] useEffect init, container:', !!mapContainer.current, 'map:', !!map.current)
+    
+    if (!mapContainer.current) {
+      console.error('[MapView] mapContainer.current is null')
+      return
+    }
+    
+    if (map.current) {
+      console.log('[MapView] map already initialized, skipping')
+      return
+    }
 
-    map.current = L.map(mapContainer.current, {
-      center: [latitude, longitude],
-      zoom: 15,
-      zoomControl: false,
-      attributionControl: true,
-    })
+    try {
+      console.log('[MapView] Creating Leaflet map...')
+      map.current = L.map(mapContainer.current, {
+        center: [latitude, longitude],
+        zoom: 15,
+        zoomControl: false,
+        attributionControl: true,
+      })
+      console.log('[MapView] Map created:', !!map.current)
 
-    // 高德地图瓦片 — 国内快速访问
-    tileLayerRef.current = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
-      attribution: '&copy; 高德地图',
-      subdomains: '1234',
-      maxZoom: 18,
-    }).addTo(map.current)
+      // 高德地图瓦片 — 国内快速访问
+      tileLayerRef.current = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+        attribution: '&copy; 高德地图',
+        subdomains: '1234',
+        maxZoom: 18,
+      }).addTo(map.current)
+      console.log('[MapView] Tile layer added')
 
-    // Zoom control top-right
-    L.control.zoom({ position: 'topright' }).addTo(map.current)
+      // Zoom control top-right
+      L.control.zoom({ position: 'topright' }).addTo(map.current)
 
-    // Layer group for markers
-    markersRef.current = L.layerGroup().addTo(map.current)
+      // Layer group for markers
+      markersRef.current = L.layerGroup().addTo(map.current)
+
+      // Force map to recalculate size after a short delay
+      setTimeout(() => {
+        if (map.current) {
+          map.current.invalidateSize()
+          console.log('[MapView] invalidateSize called')
+        }
+      }, 100)
+
+      console.log('[MapView] Map initialization complete')
+    } catch (error) {
+      console.error('[MapView] Error initializing map:', error)
+    }
 
     return () => {
-      map.current?.remove()
+      console.log('[MapView] Cleanup: removing map')
+      try {
+        map.current?.remove()
+      } catch (error) {
+        console.error('[MapView] Error removing map:', error)
+      }
       map.current = null
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
