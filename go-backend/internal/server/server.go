@@ -31,8 +31,25 @@ func (s *Server) Start() error {
 	// Create router
 	mux := http.NewServeMux()
 
-	// Register health check endpoint
-	mux.HandleFunc("/api/health", handlers.HealthHandler(s.config, s.db))
+	// Health check
+	mux.HandleFunc("GET /api/health", handlers.HealthHandler(s.config, s.db))
+
+	// Users
+	mux.HandleFunc("POST /api/users", handlers.CreateUser(s.db))
+	mux.HandleFunc("GET /api/users/{user_id}", handlers.GetUser(s.db))
+	mux.HandleFunc("PUT /api/users/{user_id}", handlers.UpdateUser(s.db))
+	mux.HandleFunc("GET /api/users/{user_id}/stats", handlers.GetUserStats(s.db))
+
+	// Capsules — exact paths first, then parameterized
+	mux.HandleFunc("POST /api/capsules", handlers.CreateCapsule(s.db))
+	mux.HandleFunc("GET /api/capsules/mine", handlers.GetMyCapsules(s.db))
+	mux.HandleFunc("GET /api/capsules/nearby", handlers.GetNearby(s.db))
+	mux.HandleFunc("GET /api/capsules/search", handlers.SearchCapsules(s.db))
+	mux.HandleFunc("GET /api/capsules/daily-recommend", handlers.GetDailyRecommend(s.db))
+	mux.HandleFunc("GET /api/capsules/shared/{share_token}", handlers.GetCapsuleByShareToken(s.db))
+	mux.HandleFunc("GET /api/capsules/{capsule_id}", handlers.GetCapsule(s.db))
+	mux.HandleFunc("POST /api/capsules/{capsule_id}/reply", handlers.ReplyToCapsule(s.db))
+	mux.HandleFunc("POST /api/capsules/{capsule_id}/regenerate-share", handlers.RegenerateShareToken(s.db))
 
 	// Serve static files from uploads directory
 	fs := http.FileServer(http.Dir(s.config.UploadDir))
