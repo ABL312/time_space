@@ -57,6 +57,18 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id: string) {
+          if (id.includes('node_modules/three')) {
+            return 'three-vendor'
+          }
+        },
+      },
+    },
+    chunkSizeWarningLimit: 750,
+  },
   server: {
     port: 5173,
     host: '0.0.0.0',

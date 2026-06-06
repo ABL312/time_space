@@ -44,7 +44,8 @@ export default function CapsuleDetailPage() {
     if (!id) return
     queueMicrotask(() => setFetchError(null))
     const cached = getCached<Capsule>(`capsule_${id}`, 10 * 60 * 1000)
-    if (cached && !selectedCapsule) {
+    const current = useCapsuleStore.getState().selectedCapsule
+    if (cached && !current) {
       useCapsuleStore.setState({ selectedCapsule: cached })
     }
     fetchCapsule(id)

@@ -1,0 +1,23 @@
+{
+  "title": "前端重构 01: Design System 基础与去 AI 味",
+  "body": "## Owner\nfrontend-dev (@lisnshsjwkz)\n\n## Goal\n建立去 AI 味、可维护的前端 Design System 基础。\n\n## Design reference\n- Linear：深色原生、精密、低噪声、半透明边界。\n- Vercel：信息架构清晰、Geist/mono 技术感、shadow-as-border。\n- Stripe：少量高级渐变与品牌级留白，不滥用。\n\n## Scope\n- 建立 tokens：color / spacing / typography / radius / elevation / motion。\n- 建立基础组件：Button, Card, Badge, Input, PageShell, SectionHeader, EmptyState, ErrorState, LoadingState。\n- 收敛 Tailwind class，避免页面内重复大段样式。\n- 不新增重型 UI 库；优先现有 Tailwind + React。\n\n## Acceptance\n- 关键页面可复用基础组件。\n- npm run build 通过。\n- 视觉明显减少“AI 堆砌感”。\n\n## Must follow\n遇到报错/不确定/接口需要对接：立即停止并向 Tostar 汇报。禁止自行猜测绕过。\n",
+  "state": "open",
+  "comments": [
+    {
+      "author": "ABL312",
+      "body": "## Orchestrator 审核结果\n\n状态：部分完成，暂不建议关闭。\n\n证据：\n- 已新增基础 UI：Button/Card/Badge/Input/PageShell/SectionHeader/EmptyState/ErrorState/LoadingState。\n- index.css 已加入 color/typography/radius/elevation/motion tokens。\n- Profile/Collections/Favorites 已开始复用组件。\n\n缺口：\n- spacing token 不完整。\n- Home/Create/CapsuleDetail/AR 仍大量原始 Tailwind / .btn / .panel。\n- Design System 尚未完全收敛重复样式。\n\n验证：npm run build 通过。"
+    },
+    {
+      "author": "ABL312",
+      "body": "## Hermes 前端重构审查结果\n\n**Status: PARTIAL，暂不建议关闭。**\n\n### 已验证\n- 新增 Design System 基础组件：`Button` / `Card` / `Badge` / `Input` / `PageShell` / `SectionHeader` / `EmptyState` / `ErrorState` / `LoadingState`\n- `index.css` 已补充 color / typography / radius / elevation / motion 等 tokens\n- `ProfilePage` / `CollectionsPage` / `FavoritesPage` 已开始接入新 UI 组件\n- `frontend npm run build` ✅ 通过\n\n### 未通过点\n- spacing token 不完整，仍大量依赖 Tailwind 原子间距\n- 核心页面仍保留大量 `.btn` / `.panel` / 手写 Tailwind：`HomePage`、`CreatePage`、`CapsuleDetailPage`、`ARPage`、`CollectionDetailPage`\n- Design System 尚未覆盖全站关键页面\n- `Card` 作为可点击 `div` 时缺少 role/tabIndex/键盘交互，影响可访问性\n- `npm run lint` ❌ 失败：34 errors / 5 warnings\n\n### 结论\n保留 open。需要继续迁移核心页面并补齐可访问性语义后再验收。"
+    },
+    {
+      "author": "ABL312",
+      "body": "## Hermes 前端修复复审结果\n\n**Status: PARTIAL，暂不建议关闭。**\n\n### 已验证进展\n- `HomePage` / `CreatePage` / `CapsuleDetailPage` 已进一步接入 `components/ui`\n- 新增 `BottomSheet` / `OfflineBanner`，移动端与离线 UX 有改进\n- `Card` 在 `interactive=true` 时会补 `role=\"button\"` / `tabIndex=0`\n- 全局 `focus-visible` ring 已加入\n- `npm run build` ✅ 通过\n- `npm run lint` ✅ 不再失败，仅剩 3 warnings\n\n### 仍需处理\n- Design System 尚未全站收敛，`ARPage` / `MapView` / `RecommendPanel` / `SharedCapsulePage` / `OnboardingPage` / `ProximityAlert` / `DanmakuLayer` 仍大量使用 `.btn` / `.panel`\n- spacing token 仍不完整，未见 `--space-*` 等明确 spacing token，页面仍大量依赖 Tailwind 原子间距\n- `Card` a11y 修复不完整：如 `HomePage` 搜索结果 `Card` 有 `onClick` 但未传 `interactive`，不会自动获得 `role/tabIndex/keyboard` 支持\n\n### 结论\n继续保留 open。建议先补齐 spacing token、统一迁移剩余 legacy `.btn/.panel`，并修复所有 clickable Card/div 的键盘可访问性。"
+    },
+    {
+      "author": "ABL312",
+      "body": "## Hermes 前端最新推送复审结果\n\n**审查目标:** `main@21a54e4`，重点前端提交 `1cee8f5 refactor: migrate .btn/.panel to Design System + PWA/a11y improvements (#39 #40 #41 #42)`  \n**Status: PARTIAL，暂不建议关闭。**\n\n### 已验证进展\n- TSX 中未再发现裸 `.btn` / `.panel` 使用，主要页面已进一步迁移 Design System。\n- `Card` 在 `interactive=true` 时会自动补 `role=\"button\"` / `tabIndex=0`。\n- 新增/完善 `ARCHITECTURE.md`，包含 DS / a11y / API / PWA / 代码分割约定。\n- `npm run build` ✅ 通过。\n- `npm run lint` ✅ 0 errors / 3 warnings。\n- `npm audit --audit-level=moderate` ✅ 0 vulnerabilities。\n\n### 仍需处理\n- `index.css` 仍保留 legacy `.panel` / `.btn` 样式定义，虽然 TSX 暂未使用，但 legacy 清理不彻底。\n- spacing token 仍未系统化：未见 `--space-*` token，页面仍大量依赖 `p-* / gap-* / px-*` Tailwind 原子间距。\n- `Card` interactive a11y 不完整：有 `role/tabIndex`，但组件内部没有统一处理 Enter/Space 触发 `onClick`。\n\n### 结论\n比上一轮明显进步，但 Design System 基础仍未达到“全站收敛 + token 化 + a11y 完整”的关闭标准。建议保留 open。"
+    }
+  ]
+}

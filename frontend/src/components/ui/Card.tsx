@@ -1,4 +1,4 @@
-import { type ReactNode, type HTMLAttributes } from 'react'
+import { type ReactNode, type HTMLAttributes, type KeyboardEvent, useCallback } from 'react'
 
 export type CardVariant = 'default' | 'elevated' | 'outlined' | 'hud'
 
@@ -29,17 +29,32 @@ export default function Card({
   interactive = false,
   className = '',
   children,
+  onClick,
+  onKeyDown,
   ...props
 }: CardProps) {
   const interactiveClasses = interactive
-    ? 'cursor-pointer transition-all duration-150 hover:border-border-active hover:shadow-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-signal/50'
+    ? 'cursor-pointer transition-all duration-150 hover:border-border-active hover:shadow-md focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-signal/50 active:scale-[0.98]'
     : ''
+
+  const handleKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLDivElement>) => {
+      onKeyDown?.(e)
+      if (interactive && !e.defaultPrevented && (e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault()
+        onClick?.(e as unknown as React.MouseEvent<HTMLDivElement>)
+      }
+    },
+    [interactive, onClick, onKeyDown]
+  )
 
   return (
     <div
       className={`rounded-[var(--radius-md)] ${variantClasses[variant]} ${paddingClasses[padding]} ${interactiveClasses} ${className}`}
       {...(interactive && !props.role && { role: 'button', tabIndex: 0 })}
       {...props}
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
     >
       {children}
     </div>

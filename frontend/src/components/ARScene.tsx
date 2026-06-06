@@ -28,6 +28,11 @@ export default function ARScene({
   const capsuleMeshesRef = useRef<Map<string, unknown>>(new Map())
   const animFrameRef = useRef<number>(0)
   const [threeReady, setThreeReady] = useState(false)
+  // Keep latest callback in a ref to avoid re-creating the raycasting effect
+  const onCapsuleClickRef = useRef(onCapsuleClick)
+  useEffect(() => {
+    onCapsuleClickRef.current = onCapsuleClick
+  }, [onCapsuleClick])
 
   // Lazy-load Three.js
   useEffect(() => {
@@ -179,7 +184,7 @@ export default function ARScene({
       if (intersects.length > 0) {
         const clickedGroup = intersects[0].object.parent as import('three').Group
         if (clickedGroup && clickedGroup.userData.capsuleId) {
-          onCapsuleClick(clickedGroup.userData.capsuleId)
+          onCapsuleClickRef.current(clickedGroup.userData.capsuleId)
         }
       }
     }
