@@ -1,62 +1,98 @@
-你是「时空信箱」项目的 frontend-dev，现在执行 Phase 2 任务。
+# frontend-dev Phase 2 任务
 
-## 你的任务: 实现用户注册页面 (Issue #3/#4 前端部分)
+你是「时空信箱」项目的 frontend-dev。
 
-### 目标
-完善 frontend/src/pages/OnboardingPage.tsx，实现完整的用户引导注册流程。
+## 项目信息
+- 仓库: D:\time_space
+- 分支: feature/phase2-enhancements (已切换)
+- GitHub: https://github.com/ABL312/time_space
+- 技术栈: Vite + React + TypeScript + Tailwind CSS v4
 
-### 当前状态
-先 git pull 获取最新代码，然后读取 OnboardingPage.tsx 看现有骨架。
+## 重要：先拉最新代码
+```bash
+git pull origin feature/phase2-enhancements
+```
 
-### 需要实现的功能
+## 任务清单（4个Issue，都是前端对接后端API）
 
-1. **昵称输入** — 1-20字验证
-   - 输入框 (暗色主题 glass 样式)
-   - 字数提示 (当前字数/20)
-   - 空值时提交按钮禁用
+### Issue #23 - 用户回应/留言系统（前端）
+**实现：**
+1. 在 src/lib/api.ts 添加：
+   ```typescript
+   export const responsesApi = {
+     list: (capsuleId: string) => fetch(`/api/capsules/${capsuleId}/responses`).then(r => r.json()),
+     create: (capsuleId: string, content: string, userId?: string, nickname?: string) =>
+       fetch(`/api/capsules/${capsuleId}/responses`, {
+         method: 'POST',
+         headers: {'Content-Type': 'application/json'},
+         body: JSON.stringify({ content, user_id: userId, nickname: nickname || '匿名' })
+       }).then(r => r.json())
+   }
+   ```
+2. 在 CapsuleDetailPage 添加：
+   - 回应列表区域（显示nickname + content + created_at）
+   - 回应输入框 + 发送按钮
+   - 发送后刷新列表
 
-2. **兴趣标签选择** — 8个预设标签，必须选恰好3个
-   - 8个标签: 校园回忆、爱情故事、家庭传承、历史文化、人生感悟、搞笑趣事、励志鼓励、未来信件
-   - 每个标签是一个可选 chip/button
-   - 选中状态: bg-primary text-white
-   - 未选中: bg-surface text-slate-400 border border-slate-600
-   - 显示已选数量 "已选 X/3"
-   - 不等于3个时提交按钮禁用
+### Issue #25 - 胶囊收藏/书签（前端）
+**实现：**
+1. 在 api.ts 添加：
+   ```typescript
+   export const favoritesApi = {
+     add: (capsuleId: string, userId: string) =>
+       fetch(`/api/favorites/${capsuleId}?user_id=${userId}`, { method: 'POST' }),
+     remove: (capsuleId: string, userId: string) =>
+       fetch(`/api/favorites/${capsuleId}?user_id=${userId}`, { method: 'DELETE' }),
+     list: (userId: string) => fetch(`/api/favorites?user_id=${userId}`).then(r => r.json()),
+     status: (capsuleId: string, userId: string) =>
+       fetch(`/api/capsules/${capsuleId}/favorite-status?user_id=${userId}`).then(r => r.json())
+   }
+   ```
+2. 在 CapsuleDetailPage 添加收藏按钮（心形图标，已收藏=实心红色）
+3. 创建 src/pages/FavoritesPage.tsx - 我的收藏列表页
+4. 在路由中添加 /favorites
 
-3. **提交流程**
-   - 调用 POST /api/users (JSON)
-   - Body: { "name": "昵称", "interest_tags": ["标签1", "标签2", "标签3"] }
-   - 成功后: 存储 user_id 到 localStorage('time_space_user_id')
-   - 跳转到 / (首页地图)
-   - 失败: 显示错误提示
+### Issue #31 - 胶囊搜索/筛选（前端）
+**实现：**
+1. 在 api.ts 添加：
+   ```typescript
+   export const searchApi = {
+     search: (params: { q?: string; tag?: string; lat?: number; lng?: number; radius?: number }) => {
+       const query = new URLSearchParams()
+       if (params.q) query.set('q', params.q)
+       if (params.tag) query.set('tag', params.tag)
+       if (params.lat) query.set('lat', String(params.lat))
+       if (params.lng) query.set('lng', String(params.lng))
+       if (params.radius) query.set('radius', String(params.radius))
+       return fetch(`/api/capsules/search?${query}`).then(r => r.json())
+     }
+   }
+   ```
+2. 在 HomePage 顶部添加搜索栏（输入框 + 搜索按钮）
+3. 搜索结果以列表形式展示（覆盖地图或侧边栏）
+4. 添加情感标签筛选按钮组
 
-4. **页面设计**
-   - 全屏居中卡片布局
-   - 顶部: ✉️ 图标 + "欢迎来到时空信箱" + 副标题
-   - 中间: 昵称输入 + 标签选择
-   - 底部: 提交按钮 (disabled 时 opacity-50)
-   - 入场动画: 卡片从下方滑入
+### Issue #24 - 时间锁胶囊（前端）
+**实现：**
+1. 在 CreatePage 添加"时间锁"选项：
+   - 开关按钮"设置开启时间"
+   - 日期时间选择器（min=明天）
+   - 提交时传递 unlock_at 参数
+2. 在 CapsuleDetailPage 处理锁定状态：
+   - 如果API返回 {locked: true, unlock_at, countdown_seconds}
+   - 显示锁定界面：大锁图标 + 倒计时（天:时:分:秒）
+   - 倒计时结束自动刷新页面
+   - 不显示消息内容
 
-5. **首次访问检测**
-   - 在 App.tsx 或 main.tsx 中: 如果 localStorage 没有 user_id，自动跳转到 /onboarding
-   - 如果已有 user_id，正常进入应用
-
-### API 契约
-- POST /api/users
-  - 格式: JSON
-  - Body: { "name": "string(1-20字)", "interest_tags": ["标签1", "标签2", "标签3"] }
-  - Response 201: { "id": "uuid", "name": "...", "interest_tags": [...], "created_at": "..." }
-
-### 技术要求
-- Tailwind utility classes, 暗色主题
-- 使用 src/lib/api.ts 中的 usersApi.createUser() 方法（如果有的话）
+## 开发规范
+- 用 Tailwind utility classes
+- 暗色主题
 - 中文 UI
-- 动画 CSS 写在 index.css
-- 完成后 git add . && git commit -m "feat(frontend): implement onboarding page with nickname + interest tags" && git push origin main
+- 完成后：
+  ```bash
+  git add -A
+  git commit -m "feat: 回应/收藏/搜索/时间锁前端 (#23,#25,#31,#24)"
+  git push origin feature/phase2-enhancements
+  ```
 
-### 工作流
-1. git pull
-2. 读取现有 OnboardingPage.tsx, App.tsx, lib/api.ts, stores/userStore.ts
-3. 实现完整注册页面
-4. 在 App.tsx 添加首次访问重定向逻辑
-5. git commit + push
+## 遇到任何错误立即停止并报告，不要猜测修复。

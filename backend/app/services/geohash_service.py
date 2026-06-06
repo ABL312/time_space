@@ -37,6 +37,24 @@ def haversine_distance(lat1: float, lng1: float, lat2: float, lng2: float) -> fl
     return R * c
 
 
+def calculate_bounding_box(lat: float, lng: float, radius_m: float) -> tuple:
+    """Calculate bounding box for initial filtering in search."""
+    # Approximate degrees per meter
+    lat_degree_per_meter = 1 / 111320
+    lng_degree_per_meter = 1 / (111320 * math.cos(math.radians(lat)))
+    
+    # Calculate bounds
+    lat_delta = radius_m * lat_degree_per_meter
+    lng_delta = radius_m * lng_degree_per_meter
+    
+    min_lat = lat - lat_delta
+    max_lat = lat + lat_delta
+    min_lng = lng - lng_delta
+    max_lng = lng + lng_delta
+    
+    return min_lat, max_lat, min_lng, max_lng
+
+
 async def find_nearby_capsules(
     db,
     lat: float,
@@ -44,6 +62,8 @@ async def find_nearby_capsules(
     radius_m: float = 1200,
     visibility: str = "public",
     limit: int = 50,
+    additional_where: str = "",
+    additional_params: tuple = (),
 ) -> list[dict]:
     """
     Find capsules near a GPS point using geohash pre-filter + haversine sort.
@@ -70,11 +90,12 @@ async def find_nearby_capsules(
         LEFT JOIN users u ON c.author_id = u.id
         WHERE SUBSTR(c.geohash, 1, {precision}) IN ({placeholders})
         AND c.visibility = ?
+        {additional_where}
         ORDER BY c.created_at DESC
         LIMIT ?
     """
 
-    params = hashes + [visibility, limit]
+    params = hashes + [visibility] + list(additional_params) + [limit]
     cursor = await db.execute(query, params)
     rows = await cursor.fetchall()
 

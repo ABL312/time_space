@@ -4,12 +4,15 @@ Capsule CRUD and nearby query routes.
 import asyncio
 import uuid
 import json
+import secrets
+import string
 from typing import Optional
+from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 
 from ..database import get_db
 from ..models import CapsuleResponse, NearbyResponse
-from ..services.geohash_service import encode, find_nearby_capsules, haversine_distance
+from ..services.geohash_service import encode, find_nearby_capsules, haversine_distance, calculate_bounding_box
 from ..services.recommend_service import rank_capsules
 from ..services.storage_service import storage_service
 from ..services.emotion_service import emotion_service
@@ -42,6 +45,12 @@ async def _analyze_and_update_emotion(capsule_id: str, message: str):
             await db.close()
     except Exception as e:
         print(f"Background emotion analysis failed for {capsule_id}: {e}")
+
+
+def _generate_share_token(length=8):
+    """Generate a random share token for capsule sharing."""
+    alphabet = string.ascii_letters + string.digits
+    return ''.join(secrets.choice(alphabet) for _ in range(length))
 
 
 def _parse_capsule_row(row: dict) -> dict:
@@ -77,24 +86,34 @@ async def create_capsule(
     target_user_id: Optional[str] = Form(None),
     author_id: Optional[str] = Form(None),
     voice_clone_url: Optional[str] = Form(None),
+    unlock_at: Optional[str] = Form(None),  # Time lock feature
     photos: list[UploadFile] = File(default=[]),
     voice: Optional[UploadFile] = File(None),
 ):
     """Create a new time capsule with optional photos and voice."""
     capsule_id = str(uuid.uuid4())
     geohash = encode(latitude, longitude)
+    share_token = _generate_share_token()
 
     db = await get_db()
     try:
+        # Parse unlock_at if provided
+        unlock_at_dt = None
+        if unlock_at:
+            try:
+                unlock_at_dt = datetime.fromisoformat(unlock_at.replace("Z", "+00:00"))
+            except ValueError:
+                raise HTTPException(status_code=400, detail="Invalid unlock_at format. Use ISO format.")
+
         # Insert capsule
         await db.execute(
             """
             INSERT INTO capsules (id, author_id, latitude, longitude, geohash,
-                message, mood_tag, visibility, target_user_id, voice_clone_url)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                message, mood_tag, visibility, target_user_id, voice_clone_url, unlock_at, share_token)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (capsule_id, author_id, latitude, longitude, geohash,
-             message, mood_tag, visibility, target_user_id, voice_clone_url),
+             message, mood_tag, visibility, target_user_id, voice_clone_url, unlock_at_dt, share_token),
         )
 
         # Handle photo uploads via StorageService
@@ -205,8 +224,11 @@ async def get_nearby(
     """Get nearby capsules sorted by distance, with recommendations."""
     db = await get_db()
     try:
-        # Find nearby capsules
-        capsules = await find_nearby_capsules(db, lat, lng, radius_m=radius)
+        # Find nearby capsules (only unlocked or expired)
+        current_time = datetime.utcnow().isoformat()
+        capsules = await find_nearby_capsules(db, lat, lng, radius_m=radius, 
+                                            additional_where="AND (unlock_at IS NULL OR unlock_at <= ?)",
+                                            additional_params=(current_time,))
 
         # Get user interest tags for ranking
         user_interest_tags = []
@@ -279,18 +301,292 @@ async def get_nearby(
         await db.close()
 
 
+
+@router.get("/search")
+async def search_capsules(
+    q: Optional[str] = None,
+    tag: Optional[str] = None,
+    lat: Optional[float] = None,
+    lng: Optional[float] = None,
+    radius: int = 5000,
+    user_id: Optional[str] = None,
+):
+    """Search capsules by content, tags, and location."""
+    db = await get_db()
+    try:
+        # Build query dynamically based on provided parameters
+        base_query = """
+            SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
+            FROM capsules c
+            LEFT JOIN users u ON c.author_id = u.id
+            WHERE 1=1
+        """
+        params = []
+        
+        # Text search in message content
+        if q:
+            base_query += " AND c.message LIKE ?"
+            params.append(f"%{q}%")
+        
+        # Tag filtering (emotion_tags)
+        if tag:
+            # Split comma-separated tags if provided
+            tags = [t.strip() for t in tag.split(",")]
+            tag_conditions = " OR ".join(["c.emotion_tags LIKE ?" for _ in tags])
+            base_query += f" AND ({tag_conditions})"
+            for t in tags:
+                params.append(f"%{t}%")
+        
+        # Location-based filtering
+        if lat is not None and lng is not None:
+            # Calculate bounding box for initial filtering
+            min_lat, max_lat, min_lng, max_lng = calculate_bounding_box(lat, lng, radius)
+            
+            base_query += " AND c.latitude BETWEEN ? AND ? AND c.longitude BETWEEN ? AND ?"
+            params.extend([min_lat, max_lat, min_lng, max_lng])
+        
+        # Only show unlocked capsules
+        current_time = datetime.utcnow().isoformat()
+        base_query += " AND (c.unlock_at IS NULL OR c.unlock_at <= ?)"
+        params.append(current_time)
+        
+        base_query += " ORDER BY c.created_at DESC LIMIT 100"
+        
+        cursor = await db.execute(base_query, params)
+        rows = await cursor.fetchall()
+        
+        # Process results and filter by precise distance if location search
+        capsules = []
+        for row in rows:
+            capsule = _parse_capsule_row(dict(row))
+            
+            # Precise distance filtering for location-based searches
+            if lat is not None and lng is not None:
+                from ..services.geohash_service import haversine_distance
+                capsule_lat = capsule["latitude"]
+                capsule_lng = capsule["longitude"]
+                distance = haversine_distance(lat, lng, capsule_lat, capsule_lng)
+                
+                # Skip capsules outside the radius
+                if distance > radius:
+                    continue
+                
+                capsule["distance_m"] = distance
+            
+            # Fetch media
+            media_cursor = await db.execute(
+                "SELECT * FROM media WHERE capsule_id = ? ORDER BY sort_order",
+                (capsule["id"],),
+            )
+            media_rows = await media_cursor.fetchall()
+            capsule["media"] = [dict(m) for m in media_rows]
+            
+            capsules.append(capsule)
+        
+        # Apply recommendation ranking if user_id is provided
+        if user_id and capsules:
+            # Get user interest tags for ranking
+            user_interest_tags = []
+            cursor = await db.execute(
+                "SELECT interest_tags FROM users WHERE id = ?", (user_id,)
+            )
+            row = await cursor.fetchone()
+            if row and row[0]:
+                try:
+                    user_interest_tags = json.loads(row[0])
+                    # Ensure it's a list
+                    if not isinstance(user_interest_tags, list):
+                        user_interest_tags = []
+                except (json.JSONDecodeError, TypeError):
+                    user_interest_tags = []
+            
+            # Simple ranking by user interests
+            if user_interest_tags:
+                for capsule in capsules:
+                    match_score = 0
+                    match_reasons = []
+                    
+                    # Check emotion tags match
+                    capsule_tags = capsule.get("emotion_tags", [])
+                    if capsule_tags:
+                        for tag in user_interest_tags:
+                            if tag in capsule_tags:
+                                match_score += 1
+                                match_reasons.append(f"匹配情感标签: {tag}")
+                    
+                    capsule["match_score"] = match_score
+                    capsule["match_reasons"] = match_reasons
+                
+                # Sort by match score
+                capsules.sort(key=lambda x: x.get("match_score", 0), reverse=True)
+        
+        return {"capsules": capsules, "total": len(capsules)}
+        
+    finally:
+        await db.close()
+
+
+@router.get("/shared/{share_token}")
+async def get_capsule_by_share_token(share_token: str):
+    """Get capsule detail by share token. Auto-increments open_count."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            """
+            SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
+            FROM capsules c
+            LEFT JOIN users u ON c.author_id = u.id
+            WHERE c.share_token = ?
+            """,
+            (share_token,),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Capsule not found")
+
+        capsule = _parse_capsule_row(dict(row))
+        
+        # Check if capsule is time-locked
+        unlock_at = capsule.get("unlock_at")
+        if unlock_at:
+            unlock_datetime = datetime.fromisoformat(unlock_at.replace("Z", "+00:00"))
+            current_datetime = datetime.utcnow()
+            
+            if unlock_datetime > current_datetime:
+                # Capsule is locked, return special response
+                countdown_seconds = int((unlock_datetime - current_datetime).total_seconds())
+                return {
+                    "locked": True,
+                    "unlock_at": unlock_at,
+                    "countdown_seconds": countdown_seconds
+                }
+
+        # Increment open_count for unlocked capsules
+        await db.execute(
+            "UPDATE capsules SET open_count = open_count + 1 WHERE share_token = ?",
+            (share_token,),
+        )
+        await db.commit()
+
+        # Fetch media
+        cursor = await db.execute(
+            "SELECT * FROM media WHERE capsule_id = ? ORDER BY sort_order",
+            (capsule["id"],),
+        )
+        media_rows = await cursor.fetchall()
+        capsule["media"] = [dict(m) for m in media_rows]
+
+        # Record interaction
+        interaction_id = str(uuid.uuid4())
+        await db.execute(
+            """
+            INSERT INTO interactions (id, capsule_id, user_id, action)
+            VALUES (?, ?, NULL, 'open')
+            """,
+            (interaction_id, capsule["id"]),
+        )
+        await db.commit()
+
+        return capsule
+    finally:
+        await db.close()
+
+
+@router.get("/daily-recommend")
+async def get_daily_recommend():
+    """Get today's recommended capsule based on date seed."""
+    from datetime import date
+    import random
+    
+    db = await get_db()
+    try:
+        # Get today's date as seed
+        today = date.today()
+        seed = int(today.strftime('%Y%m%d'))
+        random.seed(seed)
+        
+        # Find highly rated capsules (high open_count and emotion_intensity)
+        cursor = await db.execute(
+            """
+            SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
+            FROM capsules c
+            LEFT JOIN users u ON c.author_id = u.id
+            WHERE c.visibility = 'public' 
+            AND (c.unlock_at IS NULL OR c.unlock_at <= ?)
+            AND c.emotion_intensity IS NOT NULL
+            AND c.open_count > 0
+            ORDER BY c.open_count DESC, c.emotion_intensity DESC
+            LIMIT 50
+            """,
+            (datetime.utcnow().isoformat(),)
+        )
+        rows = await cursor.fetchall()
+        
+        if not rows:
+            # If no highly rated capsules, get any public capsule
+            cursor = await db.execute(
+                """
+                SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
+                FROM capsules c
+                LEFT JOIN users u ON c.author_id = u.id
+                WHERE c.visibility = 'public' 
+                AND (c.unlock_at IS NULL OR c.unlock_at <= ?)
+                ORDER BY c.created_at DESC
+                LIMIT 50
+                """,
+                (datetime.utcnow().isoformat(),)
+            )
+            rows = await cursor.fetchall()
+            
+        if not rows:
+            raise HTTPException(status_code=404, detail="No capsules available for recommendation")
+        
+        # Convert to list of dicts
+        capsules = [_parse_capsule_row(dict(row)) for row in rows]
+        
+        # Select one based on seeded random
+        selected_capsule = random.choice(capsules)
+        
+        # Fetch media for selected capsule
+        cursor = await db.execute(
+            "SELECT * FROM media WHERE capsule_id = ? ORDER BY sort_order",
+            (selected_capsule["id"],),
+        )
+        media_rows = await cursor.fetchall()
+        selected_capsule["media"] = [dict(m) for m in media_rows]
+        
+        # Generate reason based on capsule properties
+        reasons = []
+        if selected_capsule.get("open_count", 0) > 10:
+            reasons.append("今日最受欢迎")
+        if selected_capsule.get("emotion_intensity", 0) > 0.7:
+            reasons.append("情感强烈推荐")
+        if selected_capsule.get("mood_tag"):
+            reasons.append(f"{selected_capsule['mood_tag']}主题精选")
+            
+        if not reasons:
+            reasons.append("今日特别推荐")
+            
+        reason = "、".join(reasons)
+        
+        # Calculate tomorrow's midnight for expires_at
+        tomorrow = datetime.combine(today + timedelta(days=1), datetime.min.time())
+        expires_at = tomorrow.isoformat() + "Z"
+        
+        return {
+            "capsule": selected_capsule,
+            "reason": reason,
+            "expires_at": expires_at
+        }
+        
+    finally:
+        await db.close()
+
 @router.get("/{capsule_id}")
 async def get_capsule(capsule_id: str):
     """Get capsule detail by ID. Auto-increments open_count."""
     db = await get_db()
     try:
-        # Increment open_count
-        await db.execute(
-            "UPDATE capsules SET open_count = open_count + 1 WHERE id = ?",
-            (capsule_id,),
-        )
-        await db.commit()
-
         cursor = await db.execute(
             """
             SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
@@ -305,6 +601,28 @@ async def get_capsule(capsule_id: str):
             raise HTTPException(status_code=404, detail="Capsule not found")
 
         capsule = _parse_capsule_row(dict(row))
+        
+        # Check if capsule is time-locked
+        unlock_at = capsule.get("unlock_at")
+        if unlock_at:
+            unlock_datetime = datetime.fromisoformat(unlock_at.replace("Z", "+00:00"))
+            current_datetime = datetime.utcnow()
+            
+            if unlock_datetime > current_datetime:
+                # Capsule is locked, return special response
+                countdown_seconds = int((unlock_datetime - current_datetime).total_seconds())
+                return {
+                    "locked": True,
+                    "unlock_at": unlock_at,
+                    "countdown_seconds": countdown_seconds
+                }
+
+        # Increment open_count for unlocked capsules
+        await db.execute(
+            "UPDATE capsules SET open_count = open_count + 1 WHERE id = ?",
+            (capsule_id,),
+        )
+        await db.commit()
 
         # Fetch media
         cursor = await db.execute(
@@ -414,5 +732,33 @@ async def reply_to_capsule(
         reply_capsule["media"] = [dict(m) for m in media_rows]
 
         return reply_capsule
+    finally:
+        await db.close()
+
+
+@router.post("/{capsule_id}/regenerate-share")
+async def regenerate_share_token(capsule_id: str):
+    """Regenerate share token for a capsule."""
+    db = await get_db()
+    try:
+        # Check if capsule exists
+        cursor = await db.execute(
+            "SELECT id FROM capsules WHERE id = ?", (capsule_id,)
+        )
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Capsule not found")
+
+        # Generate new share token
+        new_share_token = _generate_share_token()
+        
+        # Update capsule with new share token
+        await db.execute(
+            "UPDATE capsules SET share_token = ? WHERE id = ?",
+            (new_share_token, capsule_id),
+        )
+        await db.commit()
+
+        return {"share_token": new_share_token}
     finally:
         await db.close()

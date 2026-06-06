@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useEffect } from 'react'
 import { useUserStore } from './stores/userStore'
+import { useTimeTheme } from './hooks/useTimeTheme'
 
 // Pages
 import HomePage from './pages/HomePage'
@@ -9,9 +10,20 @@ import CreatePage from './pages/CreatePage'
 import ARPage from './pages/ARPage'
 import CapsuleDetailPage from './pages/CapsuleDetailPage'
 import MyCapsulesPage from './pages/MyCapsulesPage'
+import FavoritesPage from './pages/FavoritesPage'
+import SharedCapsulePage from './pages/SharedCapsulePage'
+import ProfilePage from './pages/ProfilePage'
+import CollectionsPage from './pages/CollectionsPage'
+import CollectionDetailPage from './pages/CollectionDetailPage'
 
 function App() {
   const { user, loadUser, isLoading } = useUserStore()
+  const theme = useTimeTheme()
+
+  useEffect(() => {
+    // Apply theme to document element
+    document.documentElement.dataset.theme = theme
+  }, [theme])
 
   useEffect(() => {
     loadUser()
@@ -54,6 +66,26 @@ function App() {
         <Route
           path="/mine"
           element={user ? <MyCapsulesPage /> : <Navigate to="/onboarding" replace />}
+        />
+        <Route
+          path="/favorites"
+          element={user ? <FavoritesPage /> : <Navigate to="/onboarding" replace />}
+        />
+        <Route
+          path="/s/:token"
+          element={<SharedCapsulePage />}
+        />
+        <Route
+          path="/profile"
+          element={user ? <ProfilePage /> : <Navigate to="/onboarding" replace />}
+        />
+        <Route
+          path="/collections"
+          element={user ? <CollectionsPage /> : <Navigate to="/onboarding" replace />}
+        />
+        <Route
+          path="/collections/:id"
+          element={user ? <CollectionDetailPage /> : <Navigate to="/onboarding" replace />}
         />
         {/* Catch-all redirect */}
         <Route path="*" element={<Navigate to="/" replace />} />
