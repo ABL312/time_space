@@ -21,10 +21,11 @@ def _init_db():
 
 @pytest.fixture
 def client():
-    """Return a FastAPI TestClient."""
+    """Return a FastAPI TestClient with proper lifespan management."""
     from fastapi.testclient import TestClient
     from app.main import app
-    return TestClient(app)
+    with TestClient(app) as c:
+        yield c
 
 
 @pytest.fixture(autouse=True)
