@@ -25,9 +25,8 @@ type HealthResponse struct {
 
 // JSONError represents a standard error response structure
 type JSONError struct {
-	Error  string `json:"error"`
-	Detail string `json:"detail"` // Compatible with frontend client.ts which reads body.detail
-	Code   int    `json:"code"`
+	Error string `json:"error"`
+	Code  int    `json:"code"`
 }
 
 // HealthHandler handles health check requests
@@ -88,17 +87,14 @@ func HealthHandler(cfg *config.Config, database *sql.DB) http.HandlerFunc {
 func WriteJSON(w http.ResponseWriter, statusCode int, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	if err := json.NewEncoder(w).Encode(data); err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	json.NewEncoder(w).Encode(data)
 }
 
 // WriteError writes a standardized JSON error response
 func WriteError(w http.ResponseWriter, statusCode int, message string) {
 	errorResponse := JSONError{
-		Error:  message,
-		Detail: message, // Same as Error for backward compatibility with frontend client.ts
-		Code:   statusCode,
+		Error: message,
+		Code:  statusCode,
 	}
 	WriteJSON(w, statusCode, errorResponse)
 }

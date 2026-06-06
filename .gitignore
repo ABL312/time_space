@@ -43,9 +43,6 @@ backend/data/uploads/thumbnails/*
 backend/data/*.db
 backend/data/*.db-wal
 backend/data/*.db-shm
-go-backend/data/*.db
-go-backend/data/*.db-wal
-go-backend/data/*.db-shm
 
 # PWA
 frontend/public/workbox-*.js
@@ -54,6 +51,9 @@ frontend/public/sw.js.map
 
 # Logs
 *.log
+
+# Docs / handover files
+docs/
 
 # Local HTTPS certificates (mkcert)
 *.pem
