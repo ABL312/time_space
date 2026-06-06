@@ -394,7 +394,7 @@ class CapsuleService:
             reasons = []
             if selected.get("open_count", 0) > 10:
                 reasons.append("今日最受欢迎")
-            if selected.get("emotion_intensity", 0) > 0.7:
+            if (selected.get("emotion_intensity") or 0) > 0.7:
                 reasons.append("情感强烈推荐")
             if selected.get("mood_tag"):
                 reasons.append(f"{selected['mood_tag']}主题精选")

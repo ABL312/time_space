@@ -77,8 +77,36 @@ async def recognize_scene(
     Recognize scene from camera frame using GPT-4o Vision.
     Returns fallback data if API key not configured or analysis fails.
     """
+    # Validate file type
+    ALLOWED = {"image/jpeg", "image/png", "image/webp"}
+    content_type = (image.content_type or "").lower()
+    if content_type not in ALLOWED:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_content_type",
+                "message": f"Image type '{content_type}' not supported",
+                "accepted_types": sorted(ALLOWED),
+            },
+        )
+
+    # Read content
+    content = await image.read()
+
+    # Validate size (10 MB cap)
+    MAX_SIZE = 10 * 1024 * 1024
+    if len(content) > MAX_SIZE:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "error": "file_too_large",
+                "message": "Scene image exceeds 10 MB limit",
+                "size_bytes": len(content),
+                "max_bytes": MAX_SIZE,
+            },
+        )
+
     try:
-        content = await image.read()
         result = await scene_service.analyze(content, latitude, longitude)
         return SceneResponse(**result)
     except Exception as e:

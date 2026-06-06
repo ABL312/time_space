@@ -9,7 +9,7 @@ from typing import List
 import aiosqlite
 from pydantic import BaseModel
 
-from ..database import get_db
+from ..database import get_db_session
 from ..models import CapsuleResponse
 from ..repositories.favorite_repository import FavoriteRepository
 
@@ -25,7 +25,7 @@ class FavoriteStatusResponse(BaseModel):
 async def add_favorite(
     capsule_id: str,
     user_id: str,
-    db: aiosqlite.Connection = Depends(get_db),
+    db: aiosqlite.Connection = Depends(get_db_session),
 ):
     """Add a capsule to user's favorites."""
     cursor = await db.execute("SELECT id FROM capsules WHERE id = ?", (capsule_id,))
@@ -45,7 +45,7 @@ async def add_favorite(
 async def remove_favorite(
     capsule_id: str,
     user_id: str,
-    db: aiosqlite.Connection = Depends(get_db),
+    db: aiosqlite.Connection = Depends(get_db_session),
 ):
     """Remove a capsule from user's favorites."""
     if not await _repo.check_exists(db, user_id, capsule_id):
@@ -61,7 +61,7 @@ async def get_favorites(
     user_id: str,
     offset: int = 0,
     limit: int = 50,
-    db: aiosqlite.Connection = Depends(get_db),
+    db: aiosqlite.Connection = Depends(get_db_session),
 ):
     """Get all capsules favorited by a user, with pagination."""
     capsules_data = await _repo.list_by_user(db, user_id, offset=offset, limit=limit)
@@ -116,7 +116,7 @@ async def get_favorites(
 async def get_favorite_status(
     capsule_id: str,
     user_id: str,
-    db: aiosqlite.Connection = Depends(get_db),
+    db: aiosqlite.Connection = Depends(get_db_session),
 ):
     """Check if a capsule is favorited by a user."""
     cursor = await db.execute("SELECT id FROM capsules WHERE id = ?", (capsule_id,))

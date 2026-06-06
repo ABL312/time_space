@@ -5,10 +5,32 @@ Uses aiosqlite for async SQLite access.
 import aiosqlite
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
-# Database file path
-DB_DIR = Path(__file__).parent.parent / "data"
-DB_PATH = DB_DIR / "timespace.db"
+from .config import config
+
+
+def _resolve_db_path() -> Path:
+    """Resolve database file path from DATABASE_URL or default."""
+    url = config.database_url
+    # Parse sqlite:/// (3 slashes for relative, 4 for absolute on unix)
+    # sqlite:///./data/timespace.db → path = /./data/timespace.db
+    if url.startswith("sqlite:///"):
+        # Relative path: sqlite:///./data/timespace.db or sqlite:///C:/abs/path
+        path_str = url[len("sqlite:///"):]
+        if path_str.startswith("./") or path_str.startswith(".\\"):
+            # Relative to backend/ directory
+            return (Path(__file__).parent.parent / path_str[2:]).resolve()
+        return Path(path_str).resolve()
+    elif url.startswith("sqlite://"):
+        # sqlite:///path → same as above
+        parsed = urlparse(url)
+        return Path(parsed.path).resolve()
+    # Fallback: use url as direct path
+    return Path(url).resolve()
+
+DB_PATH = _resolve_db_path()
+DB_DIR = DB_PATH.parent
 
 # SQL schema
 SCHEMA_SQL = """
@@ -136,7 +158,10 @@ CREATE INDEX IF NOT EXISTS idx_collections_creator ON collections(creator_id);
 
 
 async def get_db() -> aiosqlite.Connection:
-    """Get a database connection. Creates DB file and tables if needed."""
+    """Get a database connection. Creates DB file and tables if needed.
+    
+    Caller is responsible for closing: await db.close()
+    """
     DB_DIR.mkdir(parents=True, exist_ok=True)
     db = await aiosqlite.connect(str(DB_PATH))
     db.row_factory = aiosqlite.Row
@@ -144,6 +169,21 @@ async def get_db() -> aiosqlite.Connection:
     await db.execute("PRAGMA foreign_keys=ON")
     await db.execute("PRAGMA busy_timeout=5000")
     return db
+
+
+async def get_db_session():
+    """Async generator for FastAPI Depends — auto-closes connection.
+    
+    Usage:
+        @app.get("/")
+        async def route(db = Depends(get_db_session)):
+            ...
+    """
+    db = await get_db()
+    try:
+        yield db
+    finally:
+        await db.close()
 
 
 async def init_db():

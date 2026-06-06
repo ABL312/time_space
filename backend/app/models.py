@@ -53,7 +53,7 @@ class CapsuleResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
     id: str
-    author_id: str
+    author_id: Optional[str] = None
     author: Optional[dict] = None
     latitude: float
     longitude: float

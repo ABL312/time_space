@@ -1,12 +1,43 @@
 """
 Emotion analysis service: GPT-4o-mini with keyword fallback.
 Analyzes capsule messages for emotional tags, sentiment, intensity, and summary.
+Includes simple in-memory TTL cache for repeated/similar messages.
 """
 import os
 import json
+import time
+import hashlib
 from typing import Optional
 
 from ..config import config
+
+# TTL cache: {sha256_hash: (timestamp, result)}
+_EMOTION_CACHE: dict[str, tuple[float, dict]] = {}
+_CACHE_TTL = 300  # seconds (5 minutes)
+_MAX_CACHE_SIZE = 100
+
+
+def _cache_key(message: str) -> str:
+    return hashlib.sha256(message.encode()).hexdigest()
+
+
+def _cache_get(message: str) -> Optional[dict]:
+    key = _cache_key(message)
+    entry = _EMOTION_CACHE.get(key)
+    if entry:
+        ts, result = entry
+        if time.time() - ts < _CACHE_TTL:
+            return result
+        del _EMOTION_CACHE[key]
+    return None
+
+
+def _cache_set(message: str, result: dict):
+    if len(_EMOTION_CACHE) >= _MAX_CACHE_SIZE:
+        # Evict oldest entry
+        oldest_key = min(_EMOTION_CACHE, key=lambda k: _EMOTION_CACHE[k][0])
+        del _EMOTION_CACHE[oldest_key]
+    _EMOTION_CACHE[_cache_key(message)] = (time.time(), result)
 
 
 class EmotionService:
@@ -59,18 +90,28 @@ class EmotionService:
             }
 
         Strategy:
-            1. Try GPT-4o-mini (3s timeout)
-            2. If fails -> keyword fallback
-            3. Always return valid result, never raise
+            1. Check TTL cache (5 min)
+            2. Try GPT-4o-mini (3s timeout)
+            3. If fails -> keyword fallback
+            4. Always return valid result, never raise
         """
+        # Check cache first
+        cached = _cache_get(message)
+        if cached:
+            return cached
+
+        result = None
         if self.api_key:
             try:
                 result = await self._analyze_with_gpt(message)
-                return result
             except Exception as e:
                 print(f"GPT emotion analysis failed: {e}, using keyword fallback")
 
-        return self._analyze_with_keywords(message)
+        if result is None:
+            result = self._analyze_with_keywords(message)
+
+        _cache_set(message, result)
+        return result
 
     async def _analyze_with_gpt(self, message: str) -> dict:
         """Call GPT-4o-mini with JSON response format. Raises on failure."""

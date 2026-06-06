@@ -21,11 +21,26 @@ class VoiceCloneService:
         self.upload_dir = config.upload_dir
         self.voice_clones_dir = self.upload_dir / "voice_clones"
         self.voice_clones_dir.mkdir(parents=True, exist_ok=True)
+        self._ensure_fallback_file()
         
         if self.api_key:
             self.client = AsyncElevenLabs(api_key=self.api_key)
         else:
             self.client = None
+
+    def _ensure_fallback_file(self):
+        """Create a minimal valid MP3 file for fallback if it doesn't exist."""
+        fallback_path = self.voice_clones_dir / "fallback.mp3"
+        if not fallback_path.exists():
+            # Minimal valid MP3: ID3v2 header + silent MPEG frame (~1 sec of silence)
+            # ID3v2.3 header (10 bytes) + MPEG1 Layer3 128kbps 44100Hz stereo frame (417 bytes)
+            minimal_mp3 = bytes([
+                # ID3v2.3 header
+                0x49, 0x44, 0x33, 0x03, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                # MPEG1 Layer3 frame header: 128kbps, 44100Hz, stereo, no padding
+                0xFF, 0xFB, 0x90, 0x00,
+            ] + [0x00] * 413)  # rest of frame (silence)
+            fallback_path.write_bytes(minimal_mp3)
     
     async def clone_and_speak(self, sample_bytes: bytes, sample_filename: str, text: str) -> Dict[str, Any]:
         """

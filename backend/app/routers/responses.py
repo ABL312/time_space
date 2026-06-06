@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from typing import List
 import aiosqlite
 
-from ..database import get_db
+from ..database import get_db_session
 from ..models import ResponseModel, ResponseCreateModel
 from ..repositories.response_repository import ResponseRepository
 
@@ -19,7 +19,7 @@ _repo = ResponseRepository()
 async def add_response(
     capsule_id: str,
     response_data: ResponseCreateModel,
-    db: aiosqlite.Connection = Depends(get_db),
+    db: aiosqlite.Connection = Depends(get_db_session),
 ):
     """Add a response to a specific capsule."""
     # Check capsule exists
@@ -44,7 +44,7 @@ async def get_responses(
     capsule_id: str,
     offset: int = 0,
     limit: int = 50,
-    db: aiosqlite.Connection = Depends(get_db),
+    db: aiosqlite.Connection = Depends(get_db_session),
 ):
     """Get all responses for a specific capsule, with pagination."""
     cursor = await db.execute("SELECT id FROM capsules WHERE id = ?", (capsule_id,))
