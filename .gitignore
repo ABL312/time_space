@@ -8,6 +8,10 @@ venv/
 # Build outputs
 frontend/dist/
 *.egg-info/
+go-backend/server
+go-backend/server.exe
+go-backend/cmd/server/server
+go-backend/cmd/server/server.exe
 
 # Environment files
 .env
