@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import type { Capsule } from '../types';
+import { capsulesApi } from '../lib/api';
 
 interface DanmakuItem {
   id: string;
@@ -18,29 +18,25 @@ const DanmakuLayer: React.FC = () => {
   useEffect(() => {
     const fetchRecentCapsules = async () => {
       try {
-        const response = await fetch('/api/capsules/recent?limit=20');
-        if (response.ok) {
-          const data = await response.json();
-          const capsules: Capsule[] = data.capsules || data;
-          
-          const newDanmakus = capsules
-            .filter(capsule => capsule.message)
-            .map(capsule => {
-              const text = capsule.message!.length > 20 
-                ? capsule.message!.substring(0, 20) + '...' 
-                : capsule.message!;
-              const emotion = (capsule.emotion_tags && capsule.emotion_tags[0]) || '💭';
-              return {
-                id: `dm-${Date.now()}-${danmakuIdRef.current++}`,
-                text: `${emotion} ${text}`,
-                emotion: (capsule.emotion_tags && capsule.emotion_tags[0]) || '',
-                top: Math.random() * 80 + 10,
-              };
-            });
-          
-          if (newDanmakus.length > 0) {
-            setDanmakus(prev => [...prev, ...newDanmakus].slice(-30));
-          }
+        const capsules = await capsulesApi.getRecent(20);
+        
+        const newDanmakus = capsules
+          .filter(capsule => capsule.message)
+          .map(capsule => {
+            const text = capsule.message!.length > 20 
+              ? capsule.message!.substring(0, 20) + '...' 
+              : capsule.message!;
+            const emotion = (capsule.emotion_tags && capsule.emotion_tags[0]) || '💭';
+            return {
+              id: `dm-${Date.now()}-${danmakuIdRef.current++}`,
+              text: `${emotion} ${text}`,
+              emotion: (capsule.emotion_tags && capsule.emotion_tags[0]) || '',
+              top: Math.random() * 80 + 10,
+            };
+          });
+        
+        if (newDanmakus.length > 0) {
+          setDanmakus(prev => [...prev, ...newDanmakus].slice(-30));
         }
       } catch (error) {
         console.error('Failed to fetch recent capsules:', error);
@@ -90,7 +86,7 @@ const DanmakuLayer: React.FC = () => {
       {/* Toggle button */}
       <button
         onClick={() => setIsVisible(!isVisible)}
-        className="absolute top-4 left-4 pointer-events-auto btn hud px-2.5 py-1.5 flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors"
+        className="absolute top-4 left-4 pointer-events-auto hud px-2.5 py-1.5 flex items-center gap-1.5 text-slate-400 hover:text-white transition-colors rounded-[var(--radius-sm)]"
         title="开关弹幕"
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

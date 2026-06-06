@@ -3,6 +3,7 @@ import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import 'leaflet.heat'
 import type { Capsule } from '../types'
+import Button from './ui/Button'
 
 // leaflet.heat augments L with heatLayer but ships no types
 declare module 'leaflet' {
@@ -198,9 +199,11 @@ export default function MapView({
     <div ref={mapContainer} className="absolute inset-0 w-full h-full" role="application" aria-label="Interactive map">
       {/* Heatmap Toggle Button */}
       <div className="absolute top-20 right-3 z-[1000]">
-        <button
+        <Button
+          variant="icon"
+          size="icon-md"
           onClick={() => setShowHeatmap(!showHeatmap)}
-          className={`btn hud px-3 py-2 flex items-center gap-2 min-h-[44px] ${
+          className={`hud flex items-center gap-2 min-h-[44px] ${
             showHeatmap 
               ? 'border-signal/30 bg-signal/5 text-signal' 
               : 'border-border text-slate-400 hover:text-slate-200'
@@ -215,7 +218,7 @@ export default function MapView({
           <span className="text-xs font-mono tracking-wider">
             {showHeatmap ? 'HEAT ON' : 'HEAT OFF'}
           </span>
-        </button>
+        </Button>
       </div>
     </div>
   )

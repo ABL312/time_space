@@ -90,7 +90,7 @@ export default function FavoritesPage() {
                 <Card
                   key={fav.id}
                   variant="default"
-                  className="cursor-pointer hover:border-signal/30 transition-colors"
+                  interactive
                   onClick={() => navigate(`/capsule/${c.id}`)}
                 >
                   <div className="flex items-start gap-3">

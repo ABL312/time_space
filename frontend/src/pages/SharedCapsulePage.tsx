@@ -89,7 +89,7 @@ export default function SharedCapsulePage() {
             <span className="inline-block w-2 h-px bg-signal-dim" />
             MESSAGE_CONTENT
           </div>
-          <div className="panel corners p-5">
+          <div className="corners p-5 rounded-[var(--radius-md)] border border-border bg-surface">
             <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-slate-200">
               {capsule.message}
             </p>
@@ -178,7 +178,7 @@ export default function SharedCapsulePage() {
             <span className="inline-block w-2 h-px bg-signal-dim" />
             LOCATION_DATA
           </div>
-          <div className="panel p-3">
+          <div className="p-3 rounded-[var(--radius-md)] border border-border bg-surface">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-white">
@@ -250,7 +250,7 @@ function VoicePlayer({ src, variant }: { src: string; variant: 'signal' | 'capsu
   const isCapsule = variant === 'capsule'
 
   return (
-    <div className={`panel p-3 ${isCapsule ? 'border-capsule/15' : 'border-signal/15'}`}>
+    <div className={`p-3 rounded-[var(--radius-md)] border bg-surface ${isCapsule ? 'border-capsule/15' : 'border-signal/15'}`}>
       <audio
         ref={audioRef}
         src={src}
@@ -262,7 +262,7 @@ function VoicePlayer({ src, variant }: { src: string; variant: 'signal' | 'capsu
       <div className="flex items-center gap-3">
         <button
           onClick={toggle}
-          className={`btn w-9 h-9 flex items-center justify-center flex-shrink-0 ${
+          className={`w-9 h-9 flex items-center justify-center flex-shrink-0 rounded-[var(--radius-sm)] ${
             isCapsule
               ? 'border border-capsule/25 bg-capsule/5 text-capsule'
               : 'border border-signal/25 bg-signal/5 text-signal'

@@ -159,13 +159,11 @@ export default function CollectionDetailPage() {
           </div>
           <div className="space-y-3">
             {collection.capsules.map((capsule, index) => (
-              <div
+              <Card
                 key={capsule.id}
-                role="button"
-                tabIndex={0}
+                variant="default"
+                interactive
                 onClick={() => navigate(`/capsule/${capsule.id}`)}
-                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate(`/capsule/${capsule.id}`) } }}
-                className="panel p-4 cursor-pointer hover:border-signal/30 transition-colors rounded-[var(--radius-md)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-signal/50"
               >
                 <div className="flex items-start gap-3">
                   <div className="w-8 h-8 border border-capsule/30 flex items-center justify-center bg-capsule/5 text-capsule font-mono text-sm flex-shrink-0 mt-0.5">
@@ -198,7 +196,7 @@ export default function CollectionDetailPage() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Card>
             ))}
           </div>
         </div>

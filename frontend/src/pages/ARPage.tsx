@@ -5,7 +5,7 @@ import { useOrientation } from '../hooks/useOrientation'
 import { useCapsuleStore } from '../stores/capsuleStore'
 import { useCapabilityCheck } from '../hooks/useCapabilityCheck'
 import { useOnline } from '../hooks/useOnline'
-import { Badge } from '../components/ui'
+import { Badge, Button } from '../components/ui'
 import ARScene from '../components/ARScene'
 
 export default function ARPage() {
@@ -48,12 +48,12 @@ export default function ARPage() {
     return (
       <div className="min-h-screen bg-bg page-in">
         <header className="sticky top-0 z-30 hud px-4 py-3 flex items-center justify-between">
-          <button onClick={() => navigate('/')} className="btn flex items-center gap-2 text-slate-400 hover:text-signal transition-colors">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="flex items-center gap-2 text-slate-400 hover:text-signal transition-colors">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
             </svg>
             <span className="text-xs font-mono tracking-wider">RETURN</span>
-          </button>
+          </Button>
           <span className="label">SCAN MODE</span>
           <div className="w-16" />
         </header>
@@ -88,7 +88,7 @@ export default function ARPage() {
                 <button
                   key={c.id}
                   onClick={() => navigate(`/capsule/${c.id}`)}
-                  className="w-full text-left panel row-hover p-3"
+                  className="w-full text-left row-hover p-3 rounded-[var(--radius-md)] border border-border bg-surface hover:border-border-active transition-colors"
                 >
                   <div className="flex items-start gap-3">
                     {/* Signal indicator */}
@@ -139,7 +139,7 @@ export default function ARPage() {
         <div className="fixed bottom-5 left-4 right-4 z-20">
           <button
             onClick={() => navigate('/create')}
-            className="btn w-full py-3 border border-capsule/25 bg-capsule/5 text-capsule text-xs font-mono tracking-wider"
+            className="w-full py-3 border border-capsule/25 bg-capsule/5 text-capsule text-xs font-mono tracking-wider rounded-[var(--radius-md)] hover:bg-capsule/10 transition-colors"
           >
             + DEPLOY CAPSULE
           </button>
@@ -164,7 +164,7 @@ export default function ARPage() {
 
       {/* HUD Top */}
       <div className="absolute top-0 left-0 right-0 p-3 flex justify-between items-start z-20">
-        <button onClick={() => navigate('/')} className="btn hud px-3 py-2 text-xs font-mono tracking-wider text-slate-300 min-h-[44px] min-w-[44px] flex items-center justify-center" aria-label="Return to map">
+        <button onClick={() => navigate('/')} className="hud px-3 py-2 text-xs font-mono tracking-wider text-slate-300 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-[var(--radius-sm)] hover:text-white transition-colors" aria-label="Return to map">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
@@ -191,7 +191,7 @@ export default function ARPage() {
             <div className="flex gap-1.5 overflow-x-auto">
               {capsules.slice(0, 3).map((c) => (
                 <button key={c.id} onClick={() => navigate(`/capsule/${c.id}`)}
-                  className="btn flex-shrink-0 px-2.5 py-1.5 border border-border text-[10px] text-slate-300 row-hover font-mono">
+                  className="flex-shrink-0 px-2.5 py-1.5 border border-border text-[10px] text-slate-300 row-hover font-mono rounded-[var(--radius-sm)] hover:border-border-active transition-colors">
                   {c.message?.slice(0, 15)}
                 </button>
               ))}
@@ -213,9 +213,9 @@ export default function ARPage() {
             <p className="data mb-1">{cameraError}</p>
             <p className="data text-slate-600 mb-6">Switching to list-based scan mode</p>
             <div className="flex gap-3 justify-center">
-              <button onClick={() => navigate('/')} className="btn px-4 py-2 border border-border text-slate-400 text-xs font-mono tracking-wider">MAP</button>
+              <button onClick={() => navigate('/')} className="px-4 py-2 border border-border text-slate-400 text-xs font-mono tracking-wider rounded-[var(--radius-sm)] hover:border-border-active transition-colors">MAP</button>
               {capsules.length > 0 && (
-                <button onClick={() => navigate(`/capsule/${capsules[0].id}`)} className="btn px-4 py-2 border border-signal/30 text-signal text-xs font-mono tracking-wider">BROWSE</button>
+                <button onClick={() => navigate(`/capsule/${capsules[0].id}`)} className="px-4 py-2 border border-signal/30 text-signal text-xs font-mono tracking-wider rounded-[var(--radius-sm)] hover:bg-signal/10 transition-colors">BROWSE</button>
               )}
             </div>
           </div>
@@ -225,7 +225,7 @@ export default function ARPage() {
       {/* iOS gyro permission */}
       {!orientation.isSupported && (
         <button onClick={orientation.requestPermission}
-          className="btn absolute top-16 left-1/2 -translate-x-1/2 hud px-4 py-2 text-xs text-signal font-mono tracking-wider z-20">
+          className="absolute top-16 left-1/2 -translate-x-1/2 hud px-4 py-2 text-xs text-signal font-mono tracking-wider z-20 rounded-[var(--radius-sm)] hover:bg-signal/5 transition-colors">
           ENABLE GYROSCOPE
         </button>
       )}

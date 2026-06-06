@@ -96,7 +96,7 @@ export default function MyCapsulesPage() {
                 <button
                   key={c.id}
                   onClick={() => navigate(`/capsule/${c.id}`)}
-                  className="w-full text-left panel row-hover flex overflow-hidden rounded-[var(--radius-md)] focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-signal/50"
+                  className="w-full text-left row-hover flex overflow-hidden rounded-[var(--radius-md)] border border-border bg-surface hover:border-border-active transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-signal/50"
                 >
                   {/* Thumbnail */}
                   <div className="relative w-20 h-20 flex-shrink-0 bg-surface-light/30 flex items-center justify-center border-r border-border">

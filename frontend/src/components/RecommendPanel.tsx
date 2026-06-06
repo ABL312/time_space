@@ -172,7 +172,7 @@ function CapsuleRow({ capsule, rank, thumb, onClick }: {
   const score = capsule.match_score != null ? Math.round(capsule.match_score) : null
 
   return (
-    <button onClick={onClick} className="w-full text-left panel row-hover flex overflow-hidden">
+    <button onClick={onClick} className="w-full text-left row-hover flex overflow-hidden rounded-[var(--radius-md)] border border-border bg-surface hover:border-border-active transition-colors">
       {/* Thumbnail / Rank */}
       <div className="relative w-16 h-16 flex-shrink-0 bg-surface-light/30 flex items-center justify-center border-r border-border">
         {thumb ? (

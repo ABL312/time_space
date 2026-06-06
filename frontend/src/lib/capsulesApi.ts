@@ -52,6 +52,11 @@ export const capsulesApi = {
   regenerateShare(capsuleId: string): Promise<{ share_token: string }> {
     return request(`/capsules/${capsuleId}/regenerate-share`, { method: 'POST' })
   },
+
+  /** Get recent capsules for danmaku display */
+  getRecent(limit: number = 20): Promise<Capsule[]> {
+    return request(`/capsules/recent${buildQuery({ limit })}`)
+  },
 }
 
 /** Responses API - capsule replies */

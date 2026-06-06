@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useGeolocation } from '../hooks/useGeolocation'
 import { useVirtualLocation } from '../hooks/useVirtualLocation'
@@ -6,8 +6,6 @@ import { useCapsuleStore } from '../stores/capsuleStore'
 import { useUserStore } from '../stores/userStore'
 import { useCapabilityCheck } from '../hooks/useCapabilityCheck'
 import { searchApi, dailyApi, getErrorMessage } from '../lib/api'
-import MapView from '../components/MapView'
-import RecommendPanel from '../components/RecommendPanel'
 import { useProximityAlert } from '../hooks/useProximityAlert'
 import ProximityAlert from '../components/ProximityAlert'
 import { useAchievements } from '../hooks/useAchievements'
@@ -15,6 +13,9 @@ import AchievementPanel from '../components/AchievementPanel'
 import DanmakuLayer from '../components/DanmakuLayer'
 import { Card, Badge, Button, Input, BottomSheet } from '../components/ui'
 import type { Capsule } from '../types'
+
+const MapView = lazy(() => import('../components/MapView'))
+const RecommendPanel = lazy(() => import('../components/RecommendPanel'))
 
 export default function HomePage() {
   const navigate = useNavigate()
@@ -115,11 +116,13 @@ export default function HomePage() {
     <div className="relative h-screen w-screen overflow-hidden bg-void">
       {/* Map */}
       {searchResults.length === 0 && (
-        <MapView
-          latitude={effectiveLatitude ?? 31.0282}
-          longitude={effectiveLongitude ?? 121.4346}
-          capsules={nearby ? [...nearby.recommended, ...nearby.others] : []}
-        />
+        <Suspense fallback={<div className="absolute inset-0 bg-void" />}>
+          <MapView
+            latitude={effectiveLatitude ?? 31.0282}
+            longitude={effectiveLongitude ?? 121.4346}
+            capsules={nearby ? [...nearby.recommended, ...nearby.others] : []}
+          />
+        </Suspense>
       )}
 
       {/* Search Results */}
@@ -131,8 +134,9 @@ export default function HomePage() {
                 key={capsule.id}
                 variant="hud"
                 padding="md"
+                interactive
                 onClick={() => navigate(`/capsule/${capsule.id}`)}
-                className="cursor-pointer hover:border-signal/30 transition-colors"
+                className="hover:border-signal/30 transition-colors"
               >
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
@@ -218,8 +222,9 @@ export default function HomePage() {
           <Card
             variant="hud"
             padding="md"
+            interactive
             onClick={() => navigate(`/capsule/${dailyRecommendation.id}`)}
-            className="cursor-pointer hover:border-signal/30 transition-colors"
+            className="hover:border-signal/30 transition-colors"
           >
             <div className="flex items-center gap-2 mb-2">
               <Badge variant="signal" dot>今日推荐</Badge>
@@ -410,7 +415,9 @@ export default function HomePage() {
       </div>
 
       {/* ── RECOMMEND PANEL ── */}
-      <RecommendPanel />
+      <Suspense fallback={null}>
+        <RecommendPanel />
+      </Suspense>
       
       {/* ── PROXIMITY ALERT ── */}
       {triggeredCapsule && distance !== null && (

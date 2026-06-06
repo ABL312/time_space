@@ -45,7 +45,7 @@ export default function CollectionsPage() {
               <Card
                 key={collection.id}
                 variant="default"
-                className="cursor-pointer hover:border-signal/30 transition-colors"
+                interactive
                 onClick={() => navigate(`/collections/${collection.id}`)}
               >
                 <div className="flex items-start gap-3">
