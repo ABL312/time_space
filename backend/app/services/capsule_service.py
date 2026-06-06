@@ -146,6 +146,7 @@ class CapsuleService:
             capsule["media"] = media
             if upload_errors:
                 capsule["upload_errors"] = upload_errors
+                capsule["partial_success"] = True
             return capsule
 
         finally:
@@ -465,6 +466,7 @@ class CapsuleService:
             reply["media"] = media
             if upload_errors:
                 reply["upload_errors"] = upload_errors
+                reply["partial_success"] = True
             return reply
         finally:
             await db.close()

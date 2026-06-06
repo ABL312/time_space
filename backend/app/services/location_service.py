@@ -1,10 +1,18 @@
-"""Reverse geocode + GPT context description for GPS coordinates."""
+"""Reverse geocode + GPT context description for GPS coordinates.
+Includes simple coordinate-rounding cache to avoid repeated Nominatim calls.
+"""
 
 import os
+import time
 import httpx
 from typing import Dict, List
 from ..services.geohash_service import find_nearby_capsules
 from ..config import config
+
+# Simple cache: keyed by (rounded_lat, rounded_lng) → 5-minute TTL
+_LOCATION_CACHE: dict[tuple, tuple[float, dict]] = {}
+_LOCATION_CACHE_TTL = 300  # 5 minutes
+_MAX_CACHE_SIZE = 50
 
 
 class LocationService:
@@ -58,16 +66,27 @@ class LocationService:
             "suggested_moods": ["青春", "怀旧", "友情"]
         }
         """
+        # Check cache (round to 4 decimal places ≈ 11m precision)
+        cache_key = (round(lat, 4), round(lng, 4))
+        cached = _LOCATION_CACHE.get(cache_key)
+        if cached:
+            ts, result = cached
+            if time.time() - ts < _LOCATION_CACHE_TTL:
+                return result
+            del _LOCATION_CACHE[cache_key]
+
         # 1. Nominatim reverse geocode (free, no API key)
         geocode_data = await self._reverse_geocode(lat, lng)
         
         if not geocode_data:
-            return {
+            result = {
                 "name": "未知位置",
                 "description": "一个神秘的地点",
                 "nearby_capsule_count": 0,
                 "suggested_moods": ["温暖", "希望"]
             }
+            self._cache_set(cache_key, result)
+            return result
         
         name = geocode_data.get("name", "未知位置")
         place_type = geocode_data.get("type", "")
@@ -82,12 +101,20 @@ class LocationService:
         # 4. Infer mood tags
         suggested_moods = self._infer_moods(place_type, name)
         
-        return {
+        result = {
             "name": name,
             "description": description,
             "nearby_capsule_count": nearby_capsule_count,
             "suggested_moods": suggested_moods
         }
+        self._cache_set(cache_key, result)
+        return result
+
+    def _cache_set(self, key, result):
+        if len(_LOCATION_CACHE) >= _MAX_CACHE_SIZE:
+            oldest = min(_LOCATION_CACHE, key=lambda k: _LOCATION_CACHE[k][0])
+            del _LOCATION_CACHE[oldest]
+        _LOCATION_CACHE[key] = (time.time(), result)
 
     async def _reverse_geocode(self, lat: float, lng: float) -> Dict:
         """Call Nominatim API, return {name, display_name, type, category}"""

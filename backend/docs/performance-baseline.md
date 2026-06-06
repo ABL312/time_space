@@ -93,34 +93,31 @@ railway.toml: Nixpacks builder, health check at /api/health
 | `foreign_keys` | ON | ON (仅在 `get_db()` 中设置) | ⚠️ `init_db()` 未设置 |
 | `busy_timeout` | ≥ 5000ms | **未配置** | ❌ 缺失 |
 | `synchronous` | NORMAL (WAL mode) | FULL (默认) | ⚠️ 可优化 |
+| `busy_timeout` | ≥ 5000ms | **5000ms** | ✅ 已配置 |
+| `synchronous` | NORMAL (WAL mode) | FULL (默认) | ⚠️ 可优化 |
 | `cache_size` | -8000 (~8MB) | -2000 (~2MB, 默认) | ⚠️ 可优化 |
 | `mmap_size` | 268435456 (256MB) | 0 (禁用, 默认) | ⚠️ 可优化 |
 | `temp_store` | MEMORY | DEFAULT | ⚠️ 可优化 |
 
 ### 3.2 风险说明
 
-- **`busy_timeout` 缺失是最高风险项**：SQLite 在写入时会锁定整个数据库。无 busy_timeout 时，并发写请求会立即收到 `SQLITE_BUSY` 错误（5秒内直接失败）。WAL 模式允许并发读写，但写操作仍是串行的。
-- **`init_db()` 中 WAL 不生效**：`init_db()` 打开连接后直接执行 schema，没有设置 WAL。虽然运行时 `get_db()` 设置了 WAL，但如果首次初始化时中断，数据库可能处于 DELETE 模式。
+- ✅ **`busy_timeout` 已配置为 5000ms**：`get_db()` 每次连接时设置。并发写入等待最多5秒后报 `SQLITE_BUSY`。
+- ✅ **`init_db()` 已设置 WAL 和 foreign_keys**：首次创建数据库即为 WAL 模式。
 - **`synchronous=FULL`**：在 WAL 模式下通常不需要 FULL；NORMAL 在 WAL 下足够安全。
 
-### 3.3 修复代码 (database.py)
+### 3.3 当前修复状态 (2026-06-06)
 
-建议在 `get_db()` 函数中统一设置所有 pragma：
+以下为 #36 已完成的性能修复：
 
-```python
-async def get_db() -> aiosqlite.Connection:
-    DB_DIR.mkdir(parents=True, exist_ok=True)
-    db = await aiosqlite.connect(str(DB_PATH))
-    db.row_factory = aiosqlite.Row
-    await db.execute("PRAGMA journal_mode=WAL")
-    await db.execute("PRAGMA foreign_keys=ON")
-    await db.execute("PRAGMA busy_timeout=5000")       # ← 新增
-    await db.execute("PRAGMA synchronous=NORMAL")       # ← 新增
-    await db.execute("PRAGMA cache_size=-8000")         # ← 新增
-    await db.execute("PRAGMA mmap_size=268435456")      # ← 新增
-    await db.execute("PRAGMA temp_store=MEMORY")        # ← 新增
-    return db
-```
+| 修复项 | 状态 |
+|--------|------|
+| N+1 查询 (mine/search/favorites/collections) | ✅ 批量 media 查询 |
+| 索引补全 (9个新索引) | ✅ `IF NOT EXISTS` 幂等 |
+| 分页 (responses/favorites/collections) | ✅ `offset`/`limit` 参数 |
+| repository 层分离 | ✅ 7 个 repository 文件 |
+| service 层封装 | ✅ capsule_service / user_service |
+| `busy_timeout` 配置 | ✅ 5000ms |
+| `DATABASE_URL` 接入 | ✅ 解析 sqlite:/// URL |
 
 ---
 
@@ -146,7 +143,7 @@ async def get_db() -> aiosqlite.Connection:
 **风险点**:
 - ⚠️ 后台情感分析 `asyncio.create_task` 无超时保护，无重试，异常仅 print
 - ⚠️ 照片处理在主请求线程中同步执行（非异步），5张照片的Pillow压缩会阻塞
-- ⚠️ 没有事务回滚处理——如果 media INSERT 失败，capsule 已存在但 media 不完整
+- ✅ 上传失败已返回 `upload_errors` 字段（#38 修复），不静默跳过
 - ⚠️ voice_clone_url 由前端传入，未验证是否为有效 URL
 
 **性能预期**: 200-800ms（无照片）/ 1-3s（5张照片含压缩）

@@ -39,6 +39,10 @@ backend/data/uploads/thumbnails/*
 backend/data/*.db
 backend/data/*.db-wal
 backend/data/*.db-shm
+backend/app/*.db
+*.db-wal
+*.db-shm
+time_spacedatatimespace.db
 
 # PWA
 frontend/public/workbox-*.js
