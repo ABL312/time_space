@@ -1,9 +1,0 @@
-STDOUT:
-
-> frontend@0.0.0 lint
-> eslint .
-
-
-STDERR:
-
-Return code: 0
