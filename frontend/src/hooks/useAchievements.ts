@@ -99,14 +99,18 @@ export const useAchievements = () => {
 
   // 持久化成就变化
   useEffect(() => {
-    if (prevAchievementsRef.current !== computedAchievements) {
+    // 深比较：检查是否真的有变化
+    const prev = prevAchievementsRef.current;
+    const hasChanges = JSON.stringify(prev) !== JSON.stringify(computedAchievements);
+    
+    if (hasChanges) {
       // Stamp real unlock timestamps for newly unlocked achievements
       const stamped = computedAchievements.map(a =>
         a.unlocked && a.unlockTime === 0 ? { ...a, unlockTime: Date.now() } : a
       );
       prevAchievementsRef.current = stamped;
-      setAchievements(stamped);
       localStorage.setItem('achievements', JSON.stringify(stamped));
+      // 注意：不再调用 setAchievements，避免无限循环
     }
   }, [computedAchievements]);
 
