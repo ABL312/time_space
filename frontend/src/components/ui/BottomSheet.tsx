@@ -81,7 +81,7 @@ export default function BottomSheet({
   if (!isOpen && translateY === 100) return null
 
   return (
-    <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={title || 'Drawer'}>
+    <div className="fixed inset-0 z-[1500]" role="dialog" aria-modal="true" aria-label={title || 'Drawer'}>
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 transition-opacity duration-300"

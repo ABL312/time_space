@@ -15,7 +15,7 @@ export default function ProximityAlert({
 }: ProximityAlertProps) {
   return (
     <div
-      className="fixed bottom-4 left-4 right-4 z-50 hud panel animate-slide-up"
+      className="fixed bottom-4 left-4 right-4 z-[1100] hud panel animate-slide-up"
       style={{
         animation: 'slide-up 0.3s ease-out forwards'
       }}

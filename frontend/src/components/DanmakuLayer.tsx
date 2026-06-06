@@ -70,7 +70,7 @@ const DanmakuLayer: React.FC = () => {
     <div 
       ref={containerRef}
       className="absolute inset-0 pointer-events-none overflow-hidden"
-      style={{ zIndex: 10 }}
+      style={{ zIndex: 500 }}
     >
       {danmakus.map((danmaku) => (
         <div

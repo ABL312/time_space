@@ -179,7 +179,7 @@ export default function HomePage() {
       <DanmakuLayer />
 
       {/* ── TOP HUD OVERLAY ── */}
-      <div className="absolute top-3 left-3 right-3 z-20 space-y-2">
+      <div className="absolute top-3 left-3 right-3 z-[1000] space-y-2">
         {/* Search bar */}
         <Card variant="hud" padding="sm" className="flex items-center gap-2">
           <Input
@@ -309,7 +309,7 @@ export default function HomePage() {
       </div>
 
       {/* ── TOP-RIGHT: Loading + Actions ── */}
-      <div className="absolute top-3 right-3 z-20 flex items-center gap-2">
+      <div className="absolute top-3 right-3 z-[1000] flex items-center gap-2">
         {isLoadingNearby && (
           <Card variant="hud" padding="sm" className="flex items-center gap-2">
             <span className="w-2.5 h-2.5 border border-signal border-t-transparent animate-spin rounded-full" />
@@ -360,7 +360,7 @@ export default function HomePage() {
       </div>
 
       {/* ── FLOATING ACTION BUTTONS ── */}
-      <div className="absolute bottom-24 right-3 z-10 flex flex-col gap-2">
+      <div className="absolute bottom-24 right-3 z-[1000] flex flex-col gap-2">
         <Button
           variant="icon"
           size="icon-md"

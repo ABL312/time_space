@@ -35,7 +35,7 @@ export default function RecommendPanel() {
   return (
     <div
       ref={panelRef}
-      className={`absolute bottom-0 left-0 right-0 z-20 transition-all duration-400 ease-out ${
+      className={`absolute bottom-0 left-0 right-0 z-[1000] transition-all duration-400 ease-out ${
         expanded ? 'max-h-[72vh]' : 'max-h-20'
       }`}
       role="region"
