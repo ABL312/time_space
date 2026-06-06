@@ -142,8 +142,8 @@
 
 ```
 1. INSERT capsule          ← 必须成功
-2. 照片上传+压缩 (Pillow)   ← 单张失败跳过，不阻塞整体
-3. 语音上传               ← 失败跳过
+2. 照片上传+压缩 (Pillow)   ← 单张失败收集到 upload_errors，不阻塞
+3. 语音上传               ← 失败收集到 upload_errors
 4. COMMIT                  ← 必须成功
 5. asyncio.create_task(    ← 异步后台，完全不阻塞响应
      _analyze_and_update_emotion()
@@ -152,12 +152,30 @@
 
 | 步骤 | 失败处理 | 影响 |
 |------|---------|------|
-| 照片处理 | `except HTTPException: continue` | 跳过该照片 |
-| 语音上传 | `except HTTPException: pass` | 胶囊无语音 |
-| 情感分析 | `except Exception: print(...)` | 后台静默失败，稍后可重试 |
-| 数据库操作 | 抛出异常 | 整个请求失败 (500) |
+| 照片处理 | 收集错误到 `upload_errors[]` | 该照片跳过，胶囊返回 `partial_success: true` |
+| 语音上传 | 收集错误到 `upload_errors[]` | 胶囊无语音，返回 `partial_success: true` |
+| 情感分析 | `except Exception: print(...)` | 后台静默失败 |
 
-**原则**：外部服务（AI、文件处理）失败不影响胶囊创建的核心流程。
+**上传错误响应格式**（201 + partial success）：
+
+```json
+{
+  "id": "capsule-uuid",
+  "message": "..." ,
+  "media": [...],
+  "partial_success": true,
+  "upload_errors": [
+    {
+      "file": "bad.gif",
+      "type": "photo",
+      "error": "invalid_content_type",
+      "message": "Image type 'image/gif' not supported"
+    }
+  ]
+}
+```
+
+前端契约：`partial_success: true` 表示胶囊创建成功但部分文件上传失败，需检查 `upload_errors` 提示用户。
 
 ---
 

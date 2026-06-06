@@ -22,9 +22,14 @@ from datetime import datetime
 
 # ---- paths -----------------------------------------------------------
 BACKEND_DIR = Path(__file__).parent.parent
-DB_PATH = BACKEND_DIR / "data" / "timespace.db"
 DOCS_DIR = BACKEND_DIR / "docs"
 OUTPUT_FILE = DOCS_DIR / "performance-check-result.txt"
+
+# Resolve DB path from config (same as app uses)
+import sys
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+from app.database import DB_PATH
 
 # ---- helpers ----------------------------------------------------------
 GREEN = "\033[92m"
@@ -74,6 +79,8 @@ def check_pragmas():
     log("")
 
     conn = sqlite3.connect(str(DB_PATH))
+    # Set pragmas to match what the app uses (raw connect doesn't inherit from aiosqlite)
+    conn.execute("PRAGMA foreign_keys=ON")
 
     checks = [
         ("journal_mode", "wal", "WAL 模式"),
@@ -212,23 +219,24 @@ def check_env():
     log(title("4. 环境变量配置"))
     log("")
 
-    vars_to_check = [
-        ("OPENAI_API_KEY", "GPT 情感分析 / 场景识别"),
-        ("ELEVENLABS_API_KEY", "语音克隆"),
-        ("UPLOAD_DIR", "文件上传目录"),
-        ("CORS_ORIGINS", "跨域来源"),
-        ("DATABASE_URL", "数据库 URL"),
-        ("ENVIRONMENT", "运行环境"),
+    from app.config import config as app_config
+
+    checks = [
+        ("OPENAI_API_KEY", "GPT 情感分析/场景识别", app_config.openai_api_key, True),
+        ("ELEVENLABS_API_KEY", "语音克隆", app_config.elevenlabs_api_key, True),
+        ("UPLOAD_DIR", "文件上传目录", str(app_config.upload_dir), False),
+        ("CORS_ORIGINS", "跨域来源", ",".join(app_config.cors_origins), False),
+        ("DATABASE_URL", "数据库 URL", str(DB_PATH), False),
+        ("ENVIRONMENT", "运行环境", app_config.environment, False),
     ]
 
-    for var, purpose in vars_to_check:
-        value = os.getenv(var, "")
-        if var.endswith("_KEY") or var.endswith("_URL"):
+    for var, purpose, value, is_secret in checks:
+        if is_secret:
             if value:
                 masked = value[:8] + "..." if len(value) > 8 else "***"
                 log(ok(f"{var}: {masked}  ({purpose})"))
             else:
-                log(warn(f"{var}: (未设置) — {purpose} 将使用 fallback"))
+                log(warn(f"{var}: (未设置 — 使用 fallback)  ({purpose})"))
         else:
             if value:
                 log(ok(f"{var}: {value}  ({purpose})"))
@@ -242,16 +250,16 @@ def check_dead_code():
     log(title("5. 代码健康检查"))
     log("")
 
-    # Check if VoiceService is used (sync version, appears to be dead code)
+    # voice_service.py was deleted in #38 (dead sync ElevenLabs code)
     voice_service_path = BACKEND_DIR / "app" / "services" / "voice_service.py"
     if voice_service_path.exists():
-        # Quick grep-like check
-        content = voice_service_path.read_text(encoding="utf-8")
         log(warn("voice_service.py (同步 ElevenLabs) — 未被任何路由引用，疑似废弃代码"))
+    else:
+        log(ok("voice_service.py 已清理 (在 #38 中删除)"))
 
     # Check for circular import risks
-    log(info("location_service.py 在 _get_nearby_capsule_count 中延迟导入 database — 避免循环引用"))
-    log(info("collections.py 在 get_collection 中延迟导入 capsules._parse_capsule_row — 避免循环引用"))
+    log(info("已通过 config.py 统一配置，无 circular import 风险"))
+    log(info("location_service.py / collections.py 内延迟导入已消除（改用 repository 层）"))
 
 
 def main():

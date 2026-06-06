@@ -35,7 +35,12 @@ class Config:
         ).split(",")
 
         # ── Upload ───────────────────────────────────────────────
-        self.upload_dir = Path(os.getenv("UPLOAD_DIR", "./data/uploads"))
+        _default_upload = os.getenv("UPLOAD_DIR", "./data/uploads")
+        if _default_upload.startswith("./") or _default_upload.startswith(".\\"):
+            # Relative to backend/ directory (not cwd-dependent)
+            self.upload_dir = (Path(__file__).parent.parent / _default_upload[2:]).resolve()
+        else:
+            self.upload_dir = Path(_default_upload).resolve()
         self.max_photo_size_mb = int(os.getenv("MAX_PHOTO_SIZE_MB", "5"))
         self.max_voice_size_mb = int(os.getenv("MAX_VOICE_SIZE_MB", "10"))
 

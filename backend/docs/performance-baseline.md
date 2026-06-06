@@ -239,47 +239,50 @@ railway.toml: Nixpacks builder, health check at /api/health
 
 ## 5. 架构风险清单
 
-### 5.1 高风险 (必须修复)
+### 5.1 已修复 (#35-#38)
 
-| # | 问题 | 影响面 | 建议 |
-|---|------|--------|------|
-| 1 | `busy_timeout` 未配置 | 全局并发 | `database.py` 加 `PRAGMA busy_timeout=5000` |
-| 2 | N+1 查询：media 逐条取 | `mine/search/collections/favorites` | 批量查询或 JOIN |
-| 3 | 无分页机制 | `responses/favorites/collections` | 加 LIMIT/OFFSET |
-| 4 | `asyncio.create_task` 无保护 | `POST /capsules` | 加 try/except 全量包裹 |
+| # | 问题 | 修复 |
+|---|------|------|
+| 1 | `busy_timeout` 未配置 | ✅ `get_db()` 设置 `PRAGMA busy_timeout=5000` |
+| 2 | N+1 查询：media 逐条取 | ✅ `_batch_fetch_media()` 批量查询 |
+| 3 | 无分页机制 | ✅ `offset`/`limit` 参数已添加 |
+| 4 | `init_db()` 未设 WAL/foreign_keys | ✅ `init_db()` 已统一 pragma |
+| 5 | DB 路径硬编码 | ✅ `DATABASE_URL` 解析接入 |
+| 6 | 无 repository 层 | ✅ 7 个 repository + 2 个 service |
+| 7 | `voice_clone_service` 无 timeout | ✅ `asyncio.wait_for` 30s |
+| 8 | `scene_service` 无 timeout/图片限制 | ✅ 10s timeout + 10MB 限制 |
+| 9 | stray DB 文件 (time_spacedatatimespace.db) | ✅ git rm --cached + gitignore |
 
-### 5.2 中风险 (建议修复)
+### 5.2 剩余优化项
 
-| # | 问题 | 影响面 | 建议 |
-|---|------|--------|------|
-| 5 | `init_db()` 未设置 WAL/foreign_keys | 数据库初始化 | 统一 pragma 设置 |
-| 6 | DB 路径硬编码 | 部署灵活性 | 使用 `DATABASE_URL` 环境变量 |
-| 7 | 无连接池/每请求新建连接 | 全局 | 考虑连接复用或单例模式 |
-| 8 | `scene_service` GPT-4o 无 timeout | `POST /ai/scene` | 加 httpx timeout |
-
-### 5.3 低风险 (后续优化)
-
-| # | 问题 | 影响面 | 建议 |
-|---|------|--------|------|
-| 9 | `synchronous=FULL` 可降为 NORMAL | WAL 模式 | pragma 优化 |
+| # | 问题 | 影响面 | 优先级 |
+|---|------|--------|--------|
+| 1 | `synchronous=FULL` 可降为 NORMAL | WAL 下速度提升 | 低 |
+| 2 | `cache_size` 默认 2MB | 查询性能 | 低 |
+| 3 | Pillow 压缩同步阻塞事件循环 | 上传性能 | 中 |
+| 4 | `asyncio.create_task` 情感分析无超时保护 | 后台任务可靠性 | 中 |
+| 5 | voice_clone_url 由前端传入未验证 | 安全性 | 低 |
 | 10 | `cache_size` 默认 2MB | 全局 | 增大到 8MB |
 | 11 | VoiceService (sync) 废弃未删 | 维护 | 清理 dead code |
 | 12 | 无 API 响应时间日志 | 可观测性 | 加 middleware 计时 |
 
 ---
 
-## 6. 缺失索引清单
+## 6. 索引清单（已全部实现）
 
-详见 [#36](https://github.com/ABL312/time_space/issues/36)，此处列出高优先级：
+以下索引已在 #36 中添加，均为 `CREATE INDEX IF NOT EXISTS` 幂等创建：
 
-| 表 | 建议索引 | 原因 |
-|----|---------|------|
-| `capsules` | `(author_id)` | `/capsules/mine` 按用户查询 |
-| `capsules` | `(visibility, created_at)` | `/daily-recommend` 过滤+排序 |
-| `capsules` | `(open_count, emotion_intensity)` | 每日推荐排序 |
-| `responses` | `(capsule_id, created_at)` | 回复列表查询 |
-| `favorites` | `(user_id, created_at)` | 收藏列表查询 |
-| `collections` | `(creator_id)` | 按创建者查询 |
+| 表 | 索引名 | 列 | 用途 |
+|----|--------|-----|------|
+| `capsules` | `idx_capsules_author` | (author_id) | `/mine` 按用户查询 |
+| `capsules` | `idx_capsules_visibility` | (visibility, created_at) | `/daily-recommend` 过滤 |
+| `capsules` | `idx_capsules_open_emotion` | (open_count, emotion_intensity) | 每日推荐排序 |
+| `capsules` | `idx_capsules_created` | (created_at) | 通用排序 |
+| `responses` | `idx_responses_capsule` | (capsule_id, created_at) | 回复列表查询 |
+| `favorites` | `idx_favorites_user` | (user_id, created_at) | 收藏列表查询 |
+| `favorites` | `idx_favorites_capsule` | (capsule_id) | 收藏状态检查 |
+| `collections` | `idx_collections_creator` | (creator_id) | 合集创建者查询 |
+| `interactions` | `idx_interactions_created` | (created_at) | 交互时间排序 |
 
 ---
 

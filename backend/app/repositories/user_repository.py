@@ -47,6 +47,50 @@ class UserRepository:
             return tags if isinstance(tags, list) else []
         return []
 
+    # ── Stats ───────────────────────────────────────────────────
+
+    async def get_stats(self, db, user_id: str) -> dict:
+        """Return aggregated statistics for a user."""
+        # Count capsules created
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM capsules WHERE author_id = ?", (user_id,))
+        created_count = (await cursor.fetchone())[0]
+        # Count opens
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM interactions WHERE user_id = ? AND action = 'open'", (user_id,))
+        opened_count = (await cursor.fetchone())[0]
+        # Count favorites
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM favorites WHERE user_id = ?", (user_id,))
+        favorited_count = (await cursor.fetchone())[0]
+        # Total capsules
+        cursor = await db.execute("SELECT COUNT(*) FROM capsules")
+        total_capsules = (await cursor.fetchone())[0]
+        return {
+            "created_count": created_count,
+            "opened_count": opened_count,
+            "favorited_count": favorited_count,
+            "total_capsules": total_capsules,
+        }
+
+    async def get_recent_opened(self, db, user_id: str, limit: int = 5) -> list[dict]:
+        cursor = await db.execute(
+            """SELECT c.*, u.name as author_name
+               FROM interactions i JOIN capsules c ON i.capsule_id = c.id
+               LEFT JOIN users u ON c.author_id = u.id
+               WHERE i.user_id = ? AND i.action = 'open'
+               ORDER BY i.created_at DESC LIMIT ?""",
+            (user_id, limit))
+        return [dict(r) for r in await cursor.fetchall()]
+
+    async def get_recent_created(self, db, user_id: str, limit: int = 5) -> list[dict]:
+        cursor = await db.execute(
+            """SELECT c.*, u.name as author_name
+               FROM capsules c LEFT JOIN users u ON c.author_id = u.id
+               WHERE c.author_id = ? ORDER BY c.created_at DESC LIMIT ?""",
+            (user_id, limit))
+        return [dict(r) for r in await cursor.fetchall()]
+
     # ── Update ──────────────────────────────────────────────────
 
     async def update(self, db, user_id: str, **fields) -> Optional[dict]:
