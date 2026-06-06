@@ -83,6 +83,7 @@ class CapsuleService:
                     detail="Invalid unlock_at format. Use ISO format.")
 
         db = await get_db()
+        upload_errors = []
         try:
             await _capsule_repo.create(
                 db,
@@ -106,13 +107,18 @@ class CapsuleService:
                     continue
                 try:
                     result = await storage_service.save_photo(photo)
-                except HTTPException:
-                    continue
-                media_id = str(uuid.uuid4())
-                await _capsule_repo.add_media(
-                    db, media_id, capsule_id, "photo",
-                    result["url"], result["thumbnail_url"], i,
-                )
+                    media_id = str(uuid.uuid4())
+                    await _capsule_repo.add_media(
+                        db, media_id, capsule_id, "photo",
+                        result["url"], result["thumbnail_url"], i,
+                    )
+                except HTTPException as e:
+                    upload_errors.append({
+                        "file": photo.filename or f"photo_{i}",
+                        "type": "photo",
+                        "error": e.detail.get("error", "upload_failed") if isinstance(e.detail, dict) else "upload_failed",
+                        "message": e.detail.get("message", str(e.detail)) if isinstance(e.detail, dict) else str(e.detail),
+                    })
 
             # Handle voice
             if voice and voice.filename:
@@ -120,8 +126,13 @@ class CapsuleService:
                     result = await storage_service.save_voice(voice)
                     await _capsule_repo.update_voice_url(
                         db, capsule_id, result["url"])
-                except HTTPException:
-                    pass
+                except HTTPException as e:
+                    upload_errors.append({
+                        "file": voice.filename,
+                        "type": "voice",
+                        "error": e.detail.get("error", "upload_failed") if isinstance(e.detail, dict) else "upload_failed",
+                        "message": e.detail.get("message", str(e.detail)) if isinstance(e.detail, dict) else str(e.detail),
+                    })
 
             await db.commit()
 
@@ -133,6 +144,8 @@ class CapsuleService:
             capsule = await _capsule_repo.get_by_id(db, capsule_id)
             media = await _capsule_repo.get_media_for_capsule(db, capsule_id)
             capsule["media"] = media
+            if upload_errors:
+                capsule["upload_errors"] = upload_errors
             return capsule
 
         finally:
@@ -407,6 +420,7 @@ class CapsuleService:
         author_id: Optional[str], photos: list[UploadFile],
     ) -> dict:
         db = await get_db()
+        upload_errors = []
         try:
             loc = await _capsule_repo.get_location(db, capsule_id)
             if not loc:
@@ -429,13 +443,18 @@ class CapsuleService:
                     continue
                 try:
                     result = await storage_service.save_photo(photo)
-                except HTTPException:
-                    continue
-                media_id = str(uuid.uuid4())
-                await _capsule_repo.add_media(
-                    db, media_id, reply_id, "photo",
-                    result["url"], result["thumbnail_url"], i,
-                )
+                    media_id = str(uuid.uuid4())
+                    await _capsule_repo.add_media(
+                        db, media_id, reply_id, "photo",
+                        result["url"], result["thumbnail_url"], i,
+                    )
+                except HTTPException as e:
+                    upload_errors.append({
+                        "file": photo.filename or f"photo_{i}",
+                        "type": "photo",
+                        "error": e.detail.get("error", "upload_failed") if isinstance(e.detail, dict) else "upload_failed",
+                        "message": e.detail.get("message", str(e.detail)) if isinstance(e.detail, dict) else str(e.detail),
+                    })
 
             await _interaction_repo.create(
                 db, capsule_id, author_id, "reply")
@@ -444,6 +463,8 @@ class CapsuleService:
             reply = await _capsule_repo.get_by_id(db, reply_id)
             media = await _capsule_repo.get_media_for_capsule(db, reply_id)
             reply["media"] = media
+            if upload_errors:
+                reply["upload_errors"] = upload_errors
             return reply
         finally:
             await db.close()

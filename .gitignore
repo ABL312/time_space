@@ -50,6 +50,7 @@ frontend/public/sw.js.map
 
 # Docs / handover files
 docs/
+!backend/docs/
 
 # Local HTTPS certificates (mkcert)
 *.pem
