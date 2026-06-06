@@ -24,6 +24,9 @@
 | `GET` | `/api/capsules/shared/{share_token}` | 分享链接获取 |
 | `POST` | `/api/capsules/{capsule_id}/reply` | 回复胶囊 |
 | `POST` | `/api/capsules/{capsule_id}/regenerate-share` | 重新生成分享令牌 |
+| `POST` | `/api/upload/photo` | 上传照片 (multipart) |
+| `POST` | `/api/upload/voice` | 上传语音 (multipart) |
+| `GET`  | `/uploads/*` | 静态文件访问 |
 
 ---
 
@@ -172,6 +175,54 @@
 | `UPLOAD_DIR` | `./data/uploads` | 上传文件目录 |
 | `CORS_ORIGINS` | `*` | CORS 允许源 |
 | `ENVIRONMENT` | `development` | 运行环境 |
+| `MAX_PHOTO_SIZE_MB` | `5` | 照片最大上传大小 (MB) |
+| `MAX_VOICE_SIZE_MB` | `10` | 语音最大上传大小 (MB) |
+
+---
+
+## Upload API
+
+### `POST /api/upload/photo`
+- 请求: `multipart/form-data`, 字段 `file`
+- 支持类型: `image/jpeg`, `image/png`, `image/webp`
+- Magic bytes 校验: JPEG(FFD8FF) / PNG(89504E47) / WebP(RIFF…WEBP)
+- 大小限制: `MAX_PHOTO_SIZE_MB` (默认 5MB)
+- 文件名: UUID + `.jpg` (路径穿越免疫)
+- 响应 200:
+  ```json
+  {"url": "/uploads/photos/uuid.jpg", "filename": "uuid.jpg"}
+  ```
+- 错误:
+  - 400 `"Image type 'xxx' not supported"`
+  - 400 `"File content does not match any supported image format"`
+  - 400 `"Missing 'file' field in form data"`
+  - 413 `"Photo exceeds maximum size of 5 MB"`
+
+### `POST /api/upload/voice`
+- 请求: `multipart/form-data`, 字段 `file`
+- 支持类型: `audio/webm`, `audio/mpeg`, `audio/mp4`, `audio/ogg`, `audio/wav`, `audio/x-wav`
+- 大小限制: `MAX_VOICE_SIZE_MB` (默认 10MB)
+- 扩展名从 MIME 映射: webm→.webm, mpeg→.mp3, mp4→.m4a, ogg→.ogg, wav→.wav
+- 响应 200:
+  ```json
+  {"url": "/uploads/voices/uuid.ext", "filename": "uuid.ext"}
+  ```
+
+### `GET /uploads/*`
+- 静态文件服务, 映射到 `UPLOAD_DIR` 目录
+- 示例: `GET /uploads/photos/abc.jpg` → `{UPLOAD_DIR}/photos/abc.jpg`
+
+### curl 示例
+```bash
+# 上传照片
+curl -F "file=@photo.jpg;type=image/jpeg" http://localhost:8002/api/upload/photo
+
+# 上传语音
+curl -F "file=@recording.webm;type=audio/webm" http://localhost:8002/api/upload/voice
+
+# 访问上传的文件
+curl -I http://localhost:8002/uploads/photos/uuid.jpg
+```
 
 ---
 

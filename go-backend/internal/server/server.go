@@ -52,6 +52,10 @@ func (s *Server) Start() error {
 	mux.HandleFunc("POST /api/capsules/{capsule_id}/reply", handlers.ReplyToCapsule(s.db))
 	mux.HandleFunc("POST /api/capsules/{capsule_id}/regenerate-share", handlers.RegenerateShareToken(s.db))
 
+	// File upload
+	mux.HandleFunc("POST /api/upload/photo", handlers.UploadPhoto(s.config))
+	mux.HandleFunc("POST /api/upload/voice", handlers.UploadVoice(s.config))
+
 	// Serve static files from uploads directory
 	fs := http.FileServer(http.Dir(s.config.UploadDir))
 	mux.Handle("/uploads/", http.StripPrefix("/uploads/", fs))
