@@ -56,10 +56,15 @@ async def get_nearby(
     lat: float,
     lng: float,
     radius: int = 1200,
+    limit: int = 50,
     user_id: Optional[str] = None,
     scene_mood_match: Optional[str] = None,
 ):
     """Get nearby capsules sorted by distance, with recommendations."""
+    # Validate limit parameter
+    if limit < 1 or limit > 100:
+        raise HTTPException(status_code=400, detail="Limit must be between 1 and 100")
+        
     return await capsule_service.get_nearby(
         lat=lat, lng=lng, radius=radius,
         user_id=user_id, scene_mood_match=scene_mood_match,

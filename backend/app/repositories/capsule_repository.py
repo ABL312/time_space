@@ -3,7 +3,7 @@ Capsule repository — database operations for capsules + media.
 """
 import json
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 from .base import parse_json_field, row_to_dict, batch_fetch_media
 
 
@@ -158,20 +158,45 @@ class CapsuleRepository:
         rows = await cursor.fetchall()
         return [self._format_capsule(dict(r)) for r in rows]
 
-    async def list_public(self, db, limit: int = 50,
-                           current_time: str = "") -> list[dict]:
-        cursor = await db.execute(
-            """
+    async def search(self, db, q: Optional[str] = None, tag: Optional[str] = None,
+                     lat: Optional[float] = None, lng: Optional[float] = None,
+                     radius: int = 5000) -> list:
+        """Search capsules with optional text, tag, and location filters."""
+        base_query = """
             SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
             FROM capsules c LEFT JOIN users u ON c.author_id = u.id
-            WHERE c.visibility = 'public'
-            AND (c.unlock_at IS NULL OR c.unlock_at <= ?)
-            ORDER BY c.created_at DESC LIMIT ?
-            """,
-            (current_time, limit),
-        )
+            WHERE 1=1
+        """
+        params = []
+
+        if q:
+            base_query += " AND c.message LIKE ?"
+            params.append(f"%{q}%")
+
+        if tag:
+            tags = [t.strip() for t in tag.split(",")]
+            tag_conditions = " OR ".join(
+                ["c.emotion_tags LIKE ?" for _ in tags])
+            base_query += f" AND ({tag_conditions})"
+            for t in tags:
+                params.append(f"%{t}%")
+
+        if lat is not None and lng is not None:
+            from ..services.geohash_service import calculate_bounding_box
+            min_lat, max_lat, min_lng, max_lng = calculate_bounding_box(
+                lat, lng, radius)
+            base_query += " AND c.latitude BETWEEN ? AND ? AND c.longitude BETWEEN ? AND ?"
+            params.extend([min_lat, max_lat, min_lng, max_lng])
+
+        # Use timezone-aware UTC
+        current_time = datetime.now(timezone.utc).isoformat()
+        base_query += " AND (c.unlock_at IS NULL OR c.unlock_at <= ?)"
+        params.append(current_time)
+        base_query += " ORDER BY c.created_at DESC LIMIT 100"
+
+        cursor = await db.execute(base_query, params)
         rows = await cursor.fetchall()
-        return [self._format_capsule(dict(r)) for r in rows]
+        return rows
 
     # ── Update ──────────────────────────────────────────────────
 

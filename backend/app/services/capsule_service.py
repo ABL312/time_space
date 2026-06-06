@@ -9,7 +9,7 @@ import uuid
 import secrets
 import string
 from typing import Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import HTTPException, UploadFile
 
@@ -166,9 +166,9 @@ class CapsuleService:
             if unlock_at:
                 unlock_datetime = datetime.fromisoformat(
                     unlock_at.replace("Z", "+00:00"))
-                if unlock_datetime > datetime.utcnow():
+                if unlock_datetime > datetime.now(timezone.utc):
                     countdown = int(
-                        (unlock_datetime - datetime.utcnow()).total_seconds())
+                        (unlock_datetime - datetime.now(timezone.utc)).total_seconds())
                     return {
                         "locked": True,
                         "unlock_at": unlock_at,
@@ -198,9 +198,9 @@ class CapsuleService:
             if unlock_at:
                 unlock_datetime = datetime.fromisoformat(
                     unlock_at.replace("Z", "+00:00"))
-                if unlock_datetime > datetime.utcnow():
+                if unlock_datetime > datetime.now(timezone.utc):
                     countdown = int(
-                        (unlock_datetime - datetime.utcnow()).total_seconds())
+                        (unlock_datetime - datetime.now(timezone.utc)).total_seconds())
                     return {
                         "locked": True,
                         "unlock_at": unlock_at,
@@ -244,7 +244,7 @@ class CapsuleService:
 
         db = await get_db()
         try:
-            current_time = datetime.utcnow().isoformat()
+            current_time = datetime.now(timezone.utc).isoformat()
             capsules_raw = await find_nearby_capsules(
                 db, lat, lng, radius_m=radius,
                 additional_where="AND (unlock_at IS NULL OR unlock_at <= ?)",
@@ -292,41 +292,12 @@ class CapsuleService:
 
         db = await get_db()
         try:
-            base_query = """
-                SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
-                FROM capsules c LEFT JOIN users u ON c.author_id = u.id
-                WHERE 1=1
-            """
-            params = []
-
-            if q:
-                base_query += " AND c.message LIKE ?"
-                params.append(f"%{q}%")
-
-            if tag:
-                tags = [t.strip() for t in tag.split(",")]
-                tag_conditions = " OR ".join(
-                    ["c.emotion_tags LIKE ?" for _ in tags])
-                base_query += f" AND ({tag_conditions})"
-                for t in tags:
-                    params.append(f"%{t}%")
-
-            if lat is not None and lng is not None:
-                min_lat, max_lat, min_lng, max_lng = calculate_bounding_box(
-                    lat, lng, radius)
-                base_query += " AND c.latitude BETWEEN ? AND ? AND c.longitude BETWEEN ? AND ?"
-                params.extend([min_lat, max_lat, min_lng, max_lng])
-
-            current_time = datetime.utcnow().isoformat()
-            base_query += " AND (c.unlock_at IS NULL OR c.unlock_at <= ?)"
-            params.append(current_time)
-            base_query += " ORDER BY c.created_at DESC LIMIT 100"
-
-            cursor = await db.execute(base_query, params)
-            rows = await cursor.fetchall()
-
+            # Use repository method for search
+            capsules_data = await _capsule_repo.search(
+                db, q=q, tag=tag, lat=lat, lng=lng, radius=radius)
+            
             capsules = []
-            for row in rows:
+            for row in capsules_data:
                 capsule = _capsule_repo._format_capsule(dict(row))
                 if lat is not None and lng is not None:
                     dist = haversine_distance(
@@ -374,7 +345,8 @@ class CapsuleService:
             seed_val = int(today.strftime("%Y%m%d"))
             random.seed(seed_val)
 
-            current_time = datetime.utcnow().isoformat()
+            # Use timezone-aware UTC
+            current_time = datetime.now(timezone.utc).isoformat()
             capsules = await _capsule_repo.list_highly_rated(
                 db, limit=50, current_time=current_time)
 
