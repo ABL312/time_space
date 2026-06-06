@@ -7,6 +7,7 @@ import { getErrorMessage } from '../lib/client'
 import type { Capsule, CapsuleResponse } from '../types'
 import { useUserStore } from '../stores/userStore'
 import { QRCodeSVG } from 'qrcode.react'
+import { Card, Badge, Button, SectionLabel, LoadingState as UILoadingState, ErrorState as UIErrorState, EmptyState } from '../components/ui'
 
 export default function CapsuleDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -54,7 +55,6 @@ export default function CapsuleDetailPage() {
       .catch((err) => setFetchError(err?.message || '加载失败'))
   }, [id, fetchCapsule, cacheResponse, getCached])
 
-  // Fetch responses when capsule is loaded
   useEffect(() => {
     if (id && selectedCapsule) {
       responsesApi.list(id)
@@ -63,7 +63,6 @@ export default function CapsuleDetailPage() {
     }
   }, [id, selectedCapsule])
 
-  // Check favorite status when capsule and user are loaded
   useEffect(() => {
     if (id && user && selectedCapsule) {
       favoritesApi.status(id, user.id)
@@ -72,14 +71,12 @@ export default function CapsuleDetailPage() {
     }
   }, [id, user, selectedCapsule])
 
-  // Handle time lock countdown
   useEffect(() => {
     if (!selectedCapsule?.unlock_at) return
 
     const unlockTime = new Date(selectedCapsule.unlock_at).getTime()
     const locked = Date.now() < unlockTime
 
-    // Set initial time lock data (deferred to avoid sync setState in effect body)
     queueMicrotask(() => {
       setTimeLockData({
         locked,
@@ -90,7 +87,6 @@ export default function CapsuleDetailPage() {
       })
     })
 
-    // If locked, start countdown
     if (locked) {
       const interval = setInterval(() => {
         const remaining = Math.max(0, Math.floor((unlockTime - Date.now()) / 1000))
@@ -120,9 +116,24 @@ export default function CapsuleDetailPage() {
     }
   }, [selectedCapsule])
 
-  if (isLoadingDetail && !selectedCapsule) return <LoadingState />
-  if (fetchError && !selectedCapsule) return <ErrorState error={fetchError} onRetry={() => { setFetchError(null); if (id) fetchCapsule(id) }} onBack={() => navigate(-1)} />
-  if (!selectedCapsule) return <NotFoundState onBack={() => navigate('/')} />
+  if (isLoadingDetail && !selectedCapsule) return <UILoadingState />
+  if (fetchError && !selectedCapsule) return (
+    <UIErrorState
+      title="SIGNAL LOST"
+      message={fetchError}
+      retry={() => { setFetchError(null); if (id) fetchCapsule(id) }}
+      className="min-h-screen"
+    />
+  )
+  if (!selectedCapsule) return (
+    <EmptyState
+      icon={<svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" /></svg>}
+      title="NOT FOUND"
+      description="Capsule record does not exist"
+      action={{ label: 'RETURN TO MAP', onClick: () => navigate('/') }}
+      className="min-h-screen"
+    />
+  )
 
   const handleResponseSubmit = async () => {
     if (!id || !newResponse.trim()) return
@@ -167,43 +178,43 @@ export default function CapsuleDetailPage() {
   return (
     <div className="min-h-screen bg-bg page-in">
       {/* NAV BAR */}
-      <header className="sticky top-0 z-30 hud px-4 py-3 flex items-center justify-between">
-        <button onClick={() => navigate(-1)} className="btn flex items-center gap-2 text-slate-400 hover:text-signal transition-colors">
+      <header className="sticky top-0 z-30 bg-bg/80 backdrop-blur-xl border-b border-border px-4 py-3 flex items-center justify-between">
+        <Button variant="icon" size="icon-sm" onClick={() => navigate(-1)}>
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
-          <span className="text-xs font-mono tracking-wider">RETURN</span>
-        </button>
-        <span className="label">CAPSULE // {c.id?.toString().padStart(4, '0')}</span>
-        <div className="flex gap-2">
-          <button 
+        </Button>
+        <span className="text-xs font-mono text-text-secondary tracking-wider">CAPSULE // {c.id?.toString().padStart(4, '0')}</span>
+        <div className="flex gap-1">
+          <Button
+            variant="icon"
+            size="icon-sm"
             onClick={() => {
               setShareUrl(`${window.location.origin}/s/${c.id}`)
               setShowSharePanel(true)
             }}
-            className="btn flex items-center justify-center w-8 h-8"
           >
-            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M7.217 10.907a2.25 2.25 0 100 2.186m0-2.186c.18.324.283.696.283 1.093s-.103.77-.283 1.093m0-2.186l9.566-5.314m-9.566 7.5l9.566 5.314m0 0a2.25 2.25 0 103.935 2.186 2.25 2.25 0 00-3.935-2.186zm0-12.814a2.25 2.25 0 103.933-2.185 2.25 2.25 0 00-3.933 2.185z" />
             </svg>
-          </button>
-          <button 
+          </Button>
+          <Button
+            variant="icon"
+            size="icon-sm"
             onClick={toggleFavorite}
             disabled={isTogglingFavorite}
-            className="btn flex items-center justify-center w-8 h-8"
+            loading={isTogglingFavorite}
           >
-            {isTogglingFavorite ? (
-              <div className="w-4 h-4 border border-signal border-t-transparent animate-spin" />
-            ) : isFavorite ? (
+            {isFavorite ? (
               <svg className="w-4 h-4 text-red-500 fill-current" viewBox="0 0 24 24">
                 <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
               </svg>
             ) : (
-              <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M21 8.25c0-2.485-2.099-4.5-4.688-4.5-1.935 0-3.597 1.126-4.312 2.733-.715-1.607-2.377-2.733-4.313-2.733C5.1 3.75 3 5.765 3 8.25c0 7.22 9 12 9 12s9-4.78 9-12z" />
               </svg>
             )}
-          </button>
+          </Button>
         </div>
       </header>
 
@@ -212,7 +223,6 @@ export default function CapsuleDetailPage() {
         {/* ── AUTHOR BLOCK ── */}
         <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`}>
           <div className="flex items-center gap-3">
-            {/* Avatar - geometric, no rounded-full */}
             <div className="w-10 h-10 border border-signal-dim/30 flex items-center justify-center bg-signal/5">
               <span className="text-sm font-semibold text-signal font-mono">
                 {c.author?.name?.charAt(0)?.toUpperCase() || '?'}
@@ -223,20 +233,16 @@ export default function CapsuleDetailPage() {
                 {c.author?.name || '匿名发送者'}
               </p>
               <div className="flex items-center gap-3 mt-0.5">
-                <span className="data">{formatDate(c.created_at)}</span>
-                <span className="data">
-                  OPENED <span className="data-value">{c.open_count}x</span>
+                <span className="text-xs font-mono text-text-tertiary">{formatDate(c.created_at)}</span>
+                <span className="text-xs font-mono text-text-tertiary">
+                  OPENED <span className="text-text-primary">{c.open_count}x</span>
                 </span>
               </div>
             </div>
             {c.sentiment && (
-              <span className={`data px-2 py-0.5 border ${
-                c.sentiment === 'positive' ? 'border-data-good/30 text-data-good' :
-                c.sentiment === 'negative' ? 'border-data-bad/30 text-data-bad' :
-                'border-slate-600/30 text-slate-400'
-              }`}>
+              <Badge variant={c.sentiment === 'positive' ? 'success' : c.sentiment === 'negative' ? 'error' : 'default'}>
                 {c.sentiment.toUpperCase()}
-              </span>
+              </Badge>
             )}
           </div>
         </section>
@@ -244,81 +250,65 @@ export default function CapsuleDetailPage() {
         {/* ── TIME LOCK ── */}
         {timeLockData?.locked && (
           <section className={`mb-6 text-center ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.1s' }}>
-            <div className="label mb-2 flex items-center justify-center gap-2">
-              <span className="inline-block w-2 h-px bg-signal-dim" />
-              TIME_LOCKED
-            </div>
-            <div className="panel corners p-6">
+            <SectionLabel>TIME_LOCKED</SectionLabel>
+            <Card variant="default" padding="lg" className="mt-2">
               <div className="w-16 h-16 mx-auto mb-4 text-slate-600">
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                 </svg>
               </div>
               <h3 className="text-lg font-medium text-white mb-2">胶囊已锁定</h3>
-              <p className="text-slate-400 mb-4">
+              <p className="text-text-secondary mb-4">
                 将于 {formatUnlockTime(timeLockData.unlock_at!)} 解锁
               </p>
               <div className="text-2xl font-mono font-bold text-signal mb-2">
                 {countdown}
               </div>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-text-muted">
                 倒计时结束后自动解锁
               </p>
-            </div>
+            </Card>
           </section>
         )}
 
         {/* ── MESSAGE ARCHIVE ── */}
         {(!timeLockData || !timeLockData.locked) && (
           <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.2s' }}>
-            <div className="label mb-2 flex items-center gap-2">
-              <span className="inline-block w-2 h-px bg-signal-dim" />
-              MESSAGE_CONTENT
-            </div>
-            <div className="panel corners p-5">
-              <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-slate-200">
+            <SectionLabel>MESSAGE_CONTENT</SectionLabel>
+            <Card variant="default" padding="md" className="mt-2">
+              <p className="text-[15px] leading-relaxed whitespace-pre-wrap text-text-primary">
                 {c.message}
               </p>
               {c.emotion_intensity != null && (
                 <div className="mt-4 pt-3 border-t border-border">
                   <div className="flex items-center gap-3">
-                    <span className="label">INTENSITY</span>
+                    <span className="text-xs font-mono text-text-tertiary">INTENSITY</span>
                     <div className="flex-1 h-px bg-surface-light relative">
                       <div
                         className="absolute left-0 top-0 h-px bg-gradient-to-r from-signal to-capsule"
                         style={{ width: `${Math.round(c.emotion_intensity * 100)}%` }}
                       />
                     </div>
-                    <span className="data-value text-xs font-mono">
+                    <span className="text-xs font-mono text-text-primary">
                       {Math.round(c.emotion_intensity * 100)}%
                     </span>
                   </div>
                 </div>
               )}
-            </div>
+            </Card>
           </section>
         )}
 
         {/* ── EMOTION TAGS ── */}
         {(!timeLockData || !timeLockData.locked) && c.emotion_tags && c.emotion_tags.length > 0 && (
           <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.3s' }}>
-            <div className="label mb-2 flex items-center gap-2">
-              <span className="inline-block w-2 h-px bg-signal-dim" />
-              EMOTION_ANALYSIS
-            </div>
-            <div className="flex flex-wrap gap-1.5">
+            <SectionLabel>EMOTION_ANALYSIS</SectionLabel>
+            <div className="flex flex-wrap gap-1.5 mt-2">
               {c.emotion_tags.map((tag) => (
-                <span
-                  key={tag}
-                  className="px-2.5 py-1 text-xs font-mono border border-primary/20 text-primary-light bg-primary/5 hover:bg-primary/10 transition-colors cursor-default"
-                >
-                  {tag}
-                </span>
+                <Badge key={tag} variant="signal" size="md">{tag}</Badge>
               ))}
               {c.emotion_summary && (
-                <span className="px-2.5 py-1 text-xs font-mono border border-surface-light text-slate-400 bg-surface/50">
-                  {c.emotion_summary}
-                </span>
+                <Badge variant="default" size="md">{c.emotion_summary}</Badge>
               )}
             </div>
           </section>
@@ -327,11 +317,10 @@ export default function CapsuleDetailPage() {
         {/* ── PHOTO ARCHIVE ── */}
         {(!timeLockData || !timeLockData.locked) && photos.length > 0 && (
           <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.4s' }}>
-            <div className="label mb-2 flex items-center gap-2">
-              <span className="inline-block w-2 h-px bg-signal-dim" />
-              PHOTO_ARCHIVE [{photos.length}]
+            <SectionLabel>PHOTO_ARCHIVE [{photos.length}]</SectionLabel>
+            <div className="mt-2">
+              <PhotoCarousel photos={photos} />
             </div>
-            <PhotoCarousel photos={photos} />
           </section>
         )}
 
@@ -340,20 +329,18 @@ export default function CapsuleDetailPage() {
           <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.5s' }}>
             {c.voice_clone_url && (
               <div className="mb-3">
-                <div className="label mb-2 flex items-center gap-2">
-                  <span className="inline-block w-2 h-px bg-capsule-dim" />
-                  VOICE_CLONE_AI
+                <SectionLabel>VOICE_CLONE_AI</SectionLabel>
+                <div className="mt-2">
+                  <VoicePlayer src={c.voice_clone_url} variant="capsule" />
                 </div>
-                <VoicePlayer src={c.voice_clone_url} variant="capsule" />
               </div>
             )}
             {c.voice_url && (
               <div>
-                <div className="label mb-2 flex items-center gap-2">
-                  <span className="inline-block w-2 h-px bg-signal-dim" />
-                  VOICE_ORIGINAL
+                <SectionLabel>VOICE_ORIGINAL</SectionLabel>
+                <div className="mt-2">
+                  <VoicePlayer src={c.voice_url} variant="signal" />
                 </div>
-                <VoicePlayer src={c.voice_url} variant="signal" />
               </div>
             )}
           </section>
@@ -361,81 +348,72 @@ export default function CapsuleDetailPage() {
 
         {/* ── LOCATION DATA ── */}
         <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.6s' }}>
-          <div className="label mb-2 flex items-center gap-2">
-            <span className="inline-block w-2 h-px bg-signal-dim" />
-            LOCATION_DATA
-          </div>
-          <div className="panel p-3">
+          <SectionLabel>LOCATION_DATA</SectionLabel>
+          <Card variant="default" padding="sm" className="mt-2">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-white">
                   {c.location_name || '未标记地点'}
                 </p>
-                <p className="data mt-1">
+                <p className="text-xs font-mono text-text-tertiary mt-1">
                   {c.latitude.toFixed(6)}°N, {c.longitude.toFixed(6)}°E
                 </p>
               </div>
               {c.distance_m != null && (
                 <div className="text-right">
-                  <span className="data-value text-lg font-mono">{formatDist(c.distance_m)}</span>
-                  <p className="data mt-0.5">FROM YOU</p>
+                  <span className="text-lg font-mono text-text-primary">{formatDist(c.distance_m)}</span>
+                  <p className="text-xs font-mono text-text-tertiary mt-0.5">FROM YOU</p>
                 </div>
               )}
             </div>
-          </div>
+          </Card>
         </section>
 
         {/* ── RESPONSES ── */}
         {(!timeLockData || !timeLockData.locked) && (
           <section className={`mb-6 ${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.7s' }}>
-            <div className="label mb-2 flex items-center gap-2">
-              <span className="inline-block w-2 h-px bg-signal-dim" />
-              RESPONSES [{responses.length}]
-            </div>
-            <div className="space-y-4">
-              {/* Response list */}
+            <SectionLabel>RESPONSES [{responses.length}]</SectionLabel>
+            <div className="space-y-4 mt-2">
               {responses.length > 0 ? (
                 responses.map((response) => (
-                  <div key={response.id} className="panel p-4">
+                  <Card key={response.id} variant="default" padding="md">
                     <div className="flex items-start justify-between mb-2">
                       <span className="font-medium text-white">{response.nickname}</span>
-                      <span className="data text-xs">{formatDate(response.created_at)}</span>
+                      <span className="text-xs font-mono text-text-tertiary">{formatDate(response.created_at)}</span>
                     </div>
-                    <p className="text-sm text-slate-300 whitespace-pre-wrap">{response.content}</p>
-                  </div>
+                    <p className="text-sm text-text-secondary whitespace-pre-wrap">{response.content}</p>
+                  </Card>
                 ))
               ) : (
-                <div className="panel p-4 text-center text-slate-500">
-                  <p>还没有人回应，来做第一个留言的人吧！</p>
-                </div>
+                <Card variant="default" padding="md" className="text-center">
+                  <p className="text-text-muted">还没有人回应，来做第一个留言的人吧！</p>
+                </Card>
               )}
 
               {/* Response input */}
-              <div className="panel p-4">
+              <Card variant="default" padding="md">
                 <textarea
                   value={newResponse}
                   onChange={(e) => setNewResponse(e.target.value)}
                   placeholder="写下你的回应..."
                   maxLength={500}
                   rows={3}
-                  className="w-full px-3 py-2 bg-surface border border-border text-white placeholder-slate-600 focus:outline-none focus:border-signal transition-colors resize-none text-sm"
+                  className="w-full px-3 py-2 bg-surface border border-border rounded-[var(--radius-sm)] text-white placeholder-slate-600 focus:outline-none focus:border-signal transition-colors resize-none text-sm"
                 />
                 <div className="flex justify-between items-center mt-2">
-                  <span className="data">{newResponse.length}/500</span>
-                  <button
+                  <span className="text-xs font-mono text-text-tertiary">{newResponse.length}/500</span>
+                  <Button
+                    variant="primary"
+                    size="sm"
                     onClick={handleResponseSubmit}
                     disabled={!newResponse.trim() || isSubmittingResponse}
-                    className={`btn px-4 py-1.5 text-xs font-mono tracking-wider border transition-all ${
-                      newResponse.trim() && !isSubmittingResponse
-                        ? 'border-primary/40 bg-primary/5 text-primary-light hover:bg-primary/10'
-                        : 'border-border text-slate-600 cursor-not-allowed'
-                    }`}
+                    loading={isSubmittingResponse}
                   >
-                    {isSubmittingResponse ? 'SENDING...' : 'SEND'}
-                  </button>
+                    SEND
+                  </Button>
                 </div>
-                {responseError && <p className="data text-data-bad mt-2 text-center">{responseError}</p>}
-              </div>
+                {responseError && <p className="text-xs font-mono text-data-bad mt-2 text-center">{responseError}</p>}
+              </Card>
             </div>
           </section>
         )}
@@ -443,13 +421,15 @@ export default function CapsuleDetailPage() {
         {/* ── ACTION ── */}
         {(!timeLockData || !timeLockData.locked) && (
           <div className={`${decoded ? 'decode-in' : 'opacity-0'}`} style={{ animationDelay: '0.8s' }}>
-            <div className="divider mb-5" />
-            <button
+            <div className="border-t border-border-subtle my-5" />
+            <Button
+              variant="capsule"
+              size="lg"
               onClick={() => navigate(`/create?reply_to=${c.id}`)}
-              className="btn w-full py-3.5 border border-capsule/30 bg-capsule/5 text-capsule text-sm font-medium tracking-wide hover:bg-capsule/10 transition-colors"
+              className="w-full"
             >
               LEAVE A RESPONSE
-            </button>
+            </Button>
           </div>
         )}
 
@@ -483,12 +463,11 @@ function PhotoCarousel({ photos }: { photos: Array<{ id: string; url: string }> 
     <div>
       <div ref={ref} onScroll={onScroll} className="flex gap-2 overflow-x-auto carousel-track pb-2 -mx-1 px-1">
         {photos.map((photo, i) => (
-          <div key={photo.id} className="flex-shrink-0 w-[80vw] max-w-72 aspect-[4/3] relative border border-border overflow-hidden">
+          <div key={photo.id} className="flex-shrink-0 w-[80vw] max-w-72 aspect-[4/3] relative border border-border rounded-[var(--radius-sm)] overflow-hidden">
             <img src={photo.url} alt="" className="w-full h-full object-cover" loading="lazy" />
-            {/* Frame counter */}
-            <div className="absolute bottom-2 right-2 data px-1.5 py-0.5 bg-void/80">
+            <Badge variant="default" className="absolute bottom-2 right-2 bg-void/80 backdrop-blur-sm">
               {String(i + 1).padStart(2, '0')}/{String(photos.length).padStart(2, '0')}
-            </div>
+            </Badge>
           </div>
         ))}
       </div>
@@ -527,7 +506,7 @@ function VoicePlayer({ src, variant }: { src: string; variant: 'signal' | 'capsu
   const isCapsule = variant === 'capsule'
 
   return (
-    <div className={`panel p-3 ${isCapsule ? 'border-capsule/15' : 'border-signal/15'}`}>
+    <Card variant="default" padding="sm" className={isCapsule ? 'border-capsule/15' : 'border-signal/15'}>
       <audio
         ref={audioRef} src={src} preload="metadata"
         onTimeUpdate={() => audioRef.current && setProgress(audioRef.current.currentTime)}
@@ -535,20 +514,21 @@ function VoicePlayer({ src, variant }: { src: string; variant: 'signal' | 'capsu
         onEnded={() => { setPlaying(false); setProgress(0) }}
       />
       <div className="flex items-center gap-3">
-        <button
+        <Button
+          variant="icon"
+          size="icon-sm"
           onClick={toggle}
-          className={`btn w-9 h-9 flex items-center justify-center flex-shrink-0 ${
-            isCapsule
-              ? 'border border-capsule/25 bg-capsule/5 text-capsule'
-              : 'border border-signal/25 bg-signal/5 text-signal'
-          }`}
+          className={isCapsule
+            ? 'border border-capsule/25 bg-capsule/5 text-capsule'
+            : 'border border-signal/25 bg-signal/5 text-signal'
+          }
         >
           {playing ? (
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6zm8 0h4v16h-4z" /></svg>
           ) : (
             <svg className="w-4 h-4 ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
           )}
-        </button>
+        </Button>
         <div className="flex-1">
           <div className="h-px bg-surface-light relative">
             <div className={`absolute left-0 top-0 h-px ${isCapsule ? 'bg-capsule' : 'bg-signal'}`} style={{ width: `${pct}%` }} />
@@ -561,73 +541,11 @@ function VoicePlayer({ src, variant }: { src: string; variant: 'signal' | 'capsu
             </div>
           )}
         </div>
-        <span className="data tabular-nums flex-shrink-0">
-          {fmtTime(progress)}<span className="text-slate-600 mx-0.5">/</span>{fmtTime(duration)}
+        <span className="text-xs font-mono text-text-tertiary tabular-nums flex-shrink-0">
+          {fmtTime(progress)}<span className="text-text-muted mx-0.5">/</span>{fmtTime(duration)}
         </span>
       </div>
-    </div>
-  )
-}
-
-// ═══════════════════════════════════════════
-// STATES
-// ═══════════════════════════════════════════
-
-function LoadingState() {
-  return (
-    <div className="min-h-screen bg-bg">
-      <header className="sticky top-0 z-30 hud px-4 py-3 flex items-center justify-between">
-        <div className="w-16 h-3 skeleton" />
-        <span className="label">DECODING...</span>
-        <div className="w-16" />
-      </header>
-      <div className="max-w-lg mx-auto px-4 py-6 space-y-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 skeleton" />
-          <div className="flex-1 space-y-2">
-            <div className="w-24 h-3 skeleton" />
-            <div className="w-36 h-2 skeleton" />
-          </div>
-        </div>
-        <div className="space-y-2">
-          <div className="w-full h-3 skeleton" />
-          <div className="w-5/6 h-3 skeleton" />
-          <div className="w-4/6 h-3 skeleton" />
-          <div className="w-3/4 h-3 skeleton" />
-        </div>
-        <div className="flex gap-2">
-          <div className="w-16 h-6 skeleton" />
-          <div className="w-14 h-6 skeleton" />
-          <div className="w-20 h-6 skeleton" />
-        </div>
-        <div className="w-full aspect-[16/9] skeleton" />
-      </div>
-    </div>
-  )
-}
-
-function ErrorState({ error, onRetry, onBack }: { error: string; onRetry: () => void; onBack: () => void }) {
-  return (
-    <div className="min-h-screen bg-bg flex flex-col items-center justify-center px-6">
-      <div className="label mb-3 text-data-bad">SIGNAL LOST</div>
-      <p className="data text-center mb-1">{error}</p>
-      <p className="data text-slate-600 mb-6">Connection to capsule archive failed</p>
-      <div className="flex gap-3">
-        <button onClick={onRetry} className="btn px-5 py-2 border border-signal/30 text-signal text-xs font-mono tracking-wider">RETRY</button>
-        <button onClick={onBack} className="btn px-5 py-2 border border-surface-light text-slate-400 text-xs font-mono tracking-wider">BACK</button>
-      </div>
-    </div>
-  )
-}
-
-function NotFoundState({ onBack }: { onBack: () => void }) {
-  return (
-    <div className="min-h-screen bg-bg flex flex-col items-center justify-center px-6">
-      <div className="label mb-3">NOT FOUND</div>
-      <p className="data text-center mb-1">Capsule record does not exist</p>
-      <p className="data text-slate-600 mb-6">It may have been deleted or the link is invalid</p>
-      <button onClick={onBack} className="btn px-5 py-2 border border-surface-light text-slate-400 text-xs font-mono tracking-wider">RETURN TO MAP</button>
-    </div>
+    </Card>
   )
 }
 
@@ -694,43 +612,37 @@ function SharePanel({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-      <div className="panel corners w-full max-w-md p-6">
+      <Card variant="default" padding="lg" className="w-full max-w-md">
         <div className="flex justify-between items-center mb-4">
           <h3 className="text-lg font-medium text-white">分享胶囊</h3>
-          <button 
-            onClick={onClose}
-            className="btn w-8 h-8 flex items-center justify-center"
-          >
-            <svg className="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <Button variant="icon" size="icon-sm" onClick={onClose}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
             </svg>
-          </button>
+          </Button>
         </div>
         
         <div className="flex flex-col items-center py-6">
-          <div className="mb-6 p-4 bg-white">
+          <div className="mb-6 p-4 bg-white rounded-[var(--radius-md)]">
             <QRCodeSVG value={shareUrl} size={200} />
           </div>
           
           <div className="w-full">
-            <p className="data mb-2">分享链接</p>
+            <p className="text-xs font-mono text-text-tertiary mb-2">分享链接</p>
             <div className="flex gap-2">
               <input
                 type="text"
                 value={shareUrl}
                 readOnly
-                className="flex-1 px-3 py-2 bg-surface border border-border text-white text-sm truncate"
+                className="flex-1 px-3 py-2 bg-surface border border-border rounded-[var(--radius-sm)] text-white text-sm truncate"
               />
-              <button
-                onClick={handleCopy}
-                className="btn px-4 py-2 border border-signal/30 text-signal text-sm font-mono tracking-wider"
-              >
+              <Button variant="primary" size="sm" onClick={handleCopy}>
                 复制
-              </button>
+              </Button>
             </div>
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   )
 }
