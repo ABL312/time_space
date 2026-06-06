@@ -1,0 +1,17 @@
+[Unit]
+Description=Time Space Go Backend
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/time-space/go-backend
+EnvironmentFile=/var/www/time-space/go-backend/.env
+ExecStart=/var/www/time-space/go-backend/server
+Restart=always
+RestartSec=5
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
