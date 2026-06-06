@@ -1,28 +1,28 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
-	"os"
+	"time-space-go/internal/config"
+	"time-space-go/internal/db"
+	"time-space-go/internal/server"
 )
 
 func main() {
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	// Load configuration
+	cfg := config.Load()
+
+	// Initialize database
+	database, err := db.Init(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("Failed to initialize database: %v", err)
 	}
+	defer database.Close()
 
-	http.HandleFunc("/api/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		fmt.Fprintf(w, `{"status":"ok","service":"go-backend","port":%q}`, port)
-	})
+	// Create and start server
+	srv := server.New(cfg, database)
 
-	// Serve static files from uploads directory
-	fs := http.FileServer(http.Dir("./uploads/"))
-	http.Handle("/uploads/", http.StripPrefix("/uploads/", fs))
-
-	log.Printf("Starting server on port %s", port)
-	log.Fatal(http.ListenAndServe(":"+port, nil))
+	if err := srv.Start(); err != nil && err != http.ErrServerClosed {
+		log.Fatalf("Failed to start server: %v", err)
+	}
 }

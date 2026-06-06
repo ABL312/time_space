@@ -2,13 +2,13 @@ package handlers
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"os"
 	"time"
 
 	"time-space-go/internal/config"
-	"time-space-go/internal/db"
 )
 
 // HealthResponse represents the health check response structure
@@ -30,17 +30,17 @@ type JSONError struct {
 }
 
 // HealthHandler handles health check requests
-func HealthHandler(cfg *config.Config, database *db.DB) http.HandlerFunc {
+func HealthHandler(cfg *config.Config, database *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Check database connectivity
 		dbStatus := map[string]interface{}{
 			"status": "unknown",
 		}
-		
+
 		if database != nil {
 			ctx, cancel := createContextWithTimeout(5)
 			defer cancel()
-			
+
 			err := database.PingContext(ctx)
 			if err != nil {
 				dbStatus["status"] = "error"
@@ -54,7 +54,7 @@ func HealthHandler(cfg *config.Config, database *db.DB) http.HandlerFunc {
 		mediaStatus := map[string]interface{}{
 			"status": "unknown",
 		}
-		
+
 		if cfg.UploadDir != "" {
 			_, err := os.Stat(cfg.UploadDir)
 			if err != nil {

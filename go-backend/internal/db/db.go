@@ -3,14 +3,15 @@ package db
 import (
 	"database/sql"
 	"fmt"
-	"log"
 
-	_ "github.com/mattn/go-sqlite3"
+	_ "modernc.org/sqlite"
 )
 
 // Init initializes the SQLite database with proper settings
 func Init(databaseURL string) (*sql.DB, error) {
-	db, err := sql.Open("sqlite3", databaseURL)
+	// For modernc.org/sqlite, we need to use sqlite:// scheme
+	// But we'll keep the same interface for compatibility
+	db, err := sql.Open("sqlite", databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database: %w", err)
 	}
@@ -25,7 +26,8 @@ func Init(databaseURL string) (*sql.DB, error) {
 	for _, setting := range settings {
 		_, err := db.Exec(setting)
 		if err != nil {
-			log.Printf("Warning: failed to execute '%s': %v", setting, err)
+			// Log warning but don't fail
+			fmt.Printf("Warning: failed to execute '%s': %v\n", setting, err)
 		}
 	}
 
