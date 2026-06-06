@@ -170,7 +170,13 @@ export function useGeolocation(options: UseGeolocationOptions = {}) {
     // may exist but silently fail. Skip directly to IP fallback.
     if (typeof window.isSecureContext === 'boolean' && !window.isSecureContext) {
       queueMicrotask(() => {
-        setState((prev) => ({ ...prev, error: '非安全上下文，GPS不可用，尝试IP定位...' }))
+        const httpsUrl = window.location.href.replace(/^http:/, 'https:')
+        setState((prev) => ({
+          ...prev,
+          error: window.location.protocol === 'http:'
+            ? `当前HTTP地址无法获取GPS，请改用 ${httpsUrl}`
+            : '非安全上下文，GPS不可用，尝试IP定位...',
+        }))
         triggerIPFallback()
       })
       return

@@ -1,5 +1,5 @@
 import { request, upload, buildQuery } from './client'
-import type { SceneResult, LocationContext, VoiceCloneResult } from '../types'
+import type { ARSceneLayout, SceneResult, LocationContext, VoiceCloneResult } from '../types'
 
 /** AI API - emotion analysis, location context, scene recognition, voice clone */
 export const aiApi = {
@@ -28,6 +28,16 @@ export const aiApi = {
     formData.append('latitude', String(lat))
     formData.append('longitude', String(lng))
     return upload('/ai/scene', formData)
+  },
+
+  /** Use Qwen-VL to choose a stable 2.5D AR card placement */
+  getARSceneLayout(image: Blob, lat: number, lng: number, capsuleCount: number): Promise<ARSceneLayout> {
+    const formData = new FormData()
+    formData.append('image', image)
+    formData.append('latitude', String(lat))
+    formData.append('longitude', String(lng))
+    formData.append('capsule_count', String(capsuleCount))
+    return upload('/ai/ar-scene-layout', formData, 35000)
   },
 
   /** Clone voice from audio sample */

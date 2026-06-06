@@ -96,6 +96,37 @@ export interface SceneResult {
   mood_match: string[]
 }
 
+/** Vision-assisted AR layout result */
+export interface ARSceneLayout {
+  scene_type: string
+  ground_visible: boolean
+  placement: {
+    anchor: string
+    x: number
+    y: number
+    scale: number
+    depth_hint: 'near' | 'middle' | 'far' | string
+  }
+  safe_zones: Array<{
+    x: number
+    y: number
+    width: number
+    height: number
+    reason: string
+  }>
+  avoid_zones: Array<{
+    x: number
+    y: number
+    width: number
+    height: number
+    reason: string
+  }>
+  atmosphere: string
+  blessing_copy: string
+  confidence: number
+  source?: string
+}
+
 /** Location context from AI */
 export interface LocationContext {
   name: string

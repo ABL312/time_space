@@ -8,6 +8,7 @@ interface ARSceneProps {
   userLat: number
   userLng: number
   deviceAlpha: number | null
+  deviceBeta?: number | null
   capsules: Capsule[]
   onCapsuleClick: (id: string) => void
 }
@@ -16,6 +17,7 @@ export default function ARScene({
   userLat,
   userLng,
   deviceAlpha,
+  deviceBeta,
   capsules,
   onCapsuleClick,
 }: ARSceneProps) {
@@ -138,18 +140,21 @@ export default function ARScene({
 
       // Position based on bearing relative to device heading
       const heading = deviceAlpha ?? 0
-      let angleDiff = bearing - heading
+      let angleDiff = heading - bearing
       if (angleDiff > 180) angleDiff -= 360
       if (angleDiff < -180) angleDiff += 360
 
-      // Only show if within ±60° field of view
-      const visible = Math.abs(angleDiff) <= 60
+      // Only show if within ±60° field of view. If the browser has not
+      // provided a compass heading yet, keep capsules visible so AR still has
+      // an obvious effect instead of rendering an empty camera view.
+      const visible = deviceAlpha == null || Math.abs(angleDiff) <= 60
       group.visible = visible
 
       if (visible) {
         // Convert angle to screen-space position
         const x = (angleDiff / 60) * 3 // spread across scene width
-        const y = 0.5 // slightly above center
+        const pitchOffset = deviceBeta == null ? 0 : Math.max(-1.2, Math.min(1.2, (deviceBeta - 60) / 35))
+        const y = 0.5 - pitchOffset
         const z = -Math.max(1, distance / 50) // further = more negative z
 
         group.position.set(x, y, z)
@@ -220,12 +225,12 @@ export default function ARScene({
         }
       }
     }
-  }, [userLat, userLng, deviceAlpha, capsules, threeReady])
+  }, [userLat, userLng, deviceAlpha, deviceBeta, capsules, threeReady])
 
   return (
     <div
       ref={containerRef}
-      className="absolute inset-0 z-10 pointer-events-none"
+      className="absolute inset-0 z-10 pointer-events-auto"
       style={{ mixBlendMode: 'screen' }}
     />
   )

@@ -33,6 +33,12 @@ func (s *Server) Start() error {
 
 	// Register health check endpoint
 	mux.HandleFunc("/api/health", handlers.HealthHandler(s.config, s.db))
+	mux.HandleFunc("/api/users", handlers.UsersHandler(s.db))
+	mux.HandleFunc("/api/users/", handlers.UsersHandler(s.db))
+	mux.HandleFunc("/api/ai", handlers.AIHandler(s.config))
+	mux.HandleFunc("/api/ai/", handlers.AIHandler(s.config))
+	mux.HandleFunc("/api/capsules", handlers.CapsulesHandler(s.db))
+	mux.HandleFunc("/api/capsules/", handlers.CapsulesHandler(s.db))
 
 	// Serve static files from uploads directory
 	fs := http.FileServer(http.Dir(s.config.UploadDir))

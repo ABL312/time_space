@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useGeolocation } from '../hooks/useGeolocation'
 import { useUserStore } from '../stores/userStore'
 import { capsulesApi, aiApi, getErrorMessage } from '../lib/api'
@@ -8,6 +8,8 @@ import { PageShell, Card, Badge, Button, SectionLabel } from '../components/ui'
 
 export default function CreatePage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const replyTo = searchParams.get('reply_to')
   const { user } = useUserStore()
   const { latitude: rawLat, longitude: rawLng, error: geoError } = useGeolocation()
   const latitude = rawLat ?? 31.0282
@@ -147,7 +149,11 @@ export default function CreatePage() {
         photos.forEach((p) => fd.append('photos', p))
         if (voiceBlob) fd.append('voice', voiceBlob, 'recording.webm')
         if (voiceCloneUrl) fd.append('voice_clone_url', voiceCloneUrl)
-        await capsulesApi.create(fd)
+        if (replyTo) {
+          await capsulesApi.reply(replyTo, fd)
+        } else {
+          await capsulesApi.create(fd)
+        }
         navigate('/')
       } catch (err: unknown) { setError(getErrorMessage(err, '创建失败')) }
       finally { setIsSubmitting(false) }

@@ -103,7 +103,7 @@ export default function HomePage() {
       const first = nearby?.recommended[0] || nearby?.others[0]
       if (first) navigate(`/capsule/${first.id}`)
     } else {
-      navigate('/ar')
+      navigate(`/ar${window.location.search}`)
     }
   }
 

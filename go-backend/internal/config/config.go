@@ -7,11 +7,13 @@ import (
 
 // Config holds the application configuration
 type Config struct {
-	Port         string
-	DatabaseURL  string
-	UploadDir    string
-	CORSOrigins  string
-	Environment  string
+	Port        string
+	DatabaseURL string
+	UploadDir   string
+	CORSOrigins string
+	Environment string
+	QwenAPIKey  string
+	QwenModel   string
 }
 
 // Load loads configuration from environment variables
@@ -22,6 +24,8 @@ func Load() *Config {
 		UploadDir:   getEnvOrDefault("UPLOAD_DIR", filepath.Join(".", "data", "uploads")),
 		CORSOrigins: getEnvOrDefault("CORS_ORIGINS", "*"),
 		Environment: getEnvOrDefault("ENVIRONMENT", "development"),
+		QwenAPIKey:  getEnvOrDefault("QWEN_API_KEY", getEnvOrDefault("DASHSCOPE_API_KEY", "")),
+		QwenModel:   getEnvOrDefault("QWEN_MODEL", "qwen-vl-plus"),
 	}
 
 	// If DATABASE_URL is not set, use default SQLite database path

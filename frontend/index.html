@@ -14,11 +14,11 @@
   </head>
   <body class="dark">
     <div id="root"></div>
-    <script>
+    <script data-cfasync="false">
       // Polyfill for React Fast Refresh (Vite HMR)
       window.$RefreshSig$ = function() { return function() {}; };
       window.$RefreshReg$ = function() {};
     </script>
-    <script type="module" src="/src/main.tsx"></script>
+    <script data-cfasync="false" type="module" src="/src/main.tsx"></script>
   </body>
 </html>

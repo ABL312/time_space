@@ -74,9 +74,9 @@ export function useCapabilityCheck(options: CapabilityCheckOptions = {}): Device
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         return false
       }
-      // Check if any video input devices exist
-      const devices = await navigator.mediaDevices.enumerateDevices()
-      return devices.some((d) => d.kind === 'videoinput')
+      // Do not rely on enumerateDevices() before permission is granted: many
+      // mobile browsers hide devices until getUserMedia is requested.
+      return true
     } catch {
       return false
     }

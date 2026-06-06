@@ -26,8 +26,13 @@ export function useOrientation() {
   })
 
   const handleOrientation = useCallback((event: DeviceOrientationEvent) => {
+    const compassEvent = event as DeviceOrientationEvent & { webkitCompassHeading?: number }
+    const alpha = typeof compassEvent.webkitCompassHeading === 'number'
+      ? compassEvent.webkitCompassHeading
+      : event.alpha
+
     setState({
-      alpha: event.alpha,
+      alpha,
       beta: event.beta,
       gamma: event.gamma,
       error: null,
