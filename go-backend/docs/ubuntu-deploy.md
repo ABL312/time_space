@@ -2,6 +2,8 @@
 
 本文档用于将 `go-backend` 部署到 Ubuntu，并通过 `systemd + nginx` 对外提供服务。
 
+> 为了让浏览器授予地理位置、摄像头、设备方向等隐私权限，外部访问入口必须是 `HTTPS + 443`。`HTTP + 80` 仅用于跳转，不能作为最终演示入口。
+
 ## 目录约定
 
 - 项目根目录：`/var/www/time-space`
@@ -9,6 +11,7 @@
 - 前端静态目录：`/var/www/time-space/frontend/dist`
 - systemd 配置：`/etc/systemd/system/time-space-go.service`
 - nginx 配置：`/etc/nginx/sites-available/time-space-go.conf`
+- TLS 证书目录（示例）：`/etc/letsencrypt/live/<your-domain>/`
 
 ## 1. 准备目录
 
@@ -25,7 +28,7 @@ mkdir -p data/uploads scripts deploy/systemd deploy/nginx docs
 cp .env.example .env
 ```
 
-根据实际域名修改 `.env` 中的 `CORS_ORIGINS`。
+根据实际域名修改 `.env` 中的 `CORS_ORIGINS`，确保包含最终的 `https://<your-domain>`。
 
 ## 2. 构建 Go Linux 二进制
 
@@ -57,7 +60,26 @@ sudo journalctl -u time-space-go.service -n 100
 sudo journalctl -u time-space-go.service -f
 ```
 
-## 4. 配置 nginx
+## 4. 准备域名与 TLS 证书
+
+上线前必须先把域名解析到 VPS，并准备可用于 nginx 的证书。推荐使用 Let's Encrypt：
+
+```bash
+sudo apt-get update
+sudo apt-get install -y certbot python3-certbot-nginx
+sudo certbot certonly --nginx -d <your-domain>
+```
+
+签发成功后，证书通常位于：
+
+```bash
+/etc/letsencrypt/live/<your-domain>/fullchain.pem
+/etc/letsencrypt/live/<your-domain>/privkey.pem
+```
+
+将 `deploy/nginx/time-space-go.conf` 中的 `YOUR_DOMAIN` 替换为真实域名。
+
+## 5. 配置 nginx
 
 复制 nginx 配置并启用站点：
 
@@ -70,22 +92,31 @@ sudo systemctl reload nginx
 
 此配置行为：
 
+- `80` 端口只做 `http -> https` 跳转
+- `443` 端口提供正式站点入口
 - `/` 指向前端静态文件 `frontend/dist`
 - `/api/` 反向代理到 `127.0.0.1:8080`
 - `/uploads/` 反向代理到 `127.0.0.1:8080`
 
-## 5. 健康检查
+## 6. 健康检查
 
 本机检查：
 
 ```bash
 curl http://127.0.0.1:8080/api/health
-curl http://127.0.0.1/api/health
+curl -I http://<your-domain>
+curl -I https://<your-domain>
+curl https://<your-domain>/api/health
 ```
 
-确认返回 JSON 且包含 `status: ok`。
+确认：
 
-## 6. 发布流程
+- `127.0.0.1:8080` 返回 JSON 且包含 `status: ok`
+- `http://<your-domain>` 返回 `301/308` 到 `https://<your-domain>`
+- `https://<your-domain>` 可正常打开站点
+- `https://<your-domain>/api/health` 返回 JSON 且包含 `status: ok`
+
+## 7. 发布流程
 
 每次更新 Go 后端后执行：
 
@@ -95,9 +126,10 @@ git pull
 ./scripts/build-linux.sh
 sudo systemctl restart time-space-go.service
 curl http://127.0.0.1:8080/api/health
+curl -I https://<your-domain>
 ```
 
-## 7. 回滚流程
+## 8. 回滚流程
 
 推荐在发布前备份当前二进制：
 
