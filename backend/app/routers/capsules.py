@@ -301,159 +301,6 @@ async def get_nearby(
         await db.close()
 
 
-@router.get("/{capsule_id}")
-async def get_capsule(capsule_id: str):
-    """Get capsule detail by ID. Auto-increments open_count."""
-    db = await get_db()
-    try:
-        cursor = await db.execute(
-            """
-            SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
-            FROM capsules c
-            LEFT JOIN users u ON c.author_id = u.id
-            WHERE c.id = ?
-            """,
-            (capsule_id,),
-        )
-        row = await cursor.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Capsule not found")
-
-        capsule = _parse_capsule_row(dict(row))
-        
-        # Check if capsule is time-locked
-        unlock_at = capsule.get("unlock_at")
-        if unlock_at:
-            unlock_datetime = datetime.fromisoformat(unlock_at.replace("Z", "+00:00"))
-            current_datetime = datetime.utcnow()
-            
-            if unlock_datetime > current_datetime:
-                # Capsule is locked, return special response
-                countdown_seconds = int((unlock_datetime - current_datetime).total_seconds())
-                return {
-                    "locked": True,
-                    "unlock_at": unlock_at,
-                    "countdown_seconds": countdown_seconds
-                }
-
-        # Increment open_count for unlocked capsules
-        await db.execute(
-            "UPDATE capsules SET open_count = open_count + 1 WHERE id = ?",
-            (capsule_id,),
-        )
-        await db.commit()
-
-        # Fetch media
-        cursor = await db.execute(
-            "SELECT * FROM media WHERE capsule_id = ? ORDER BY sort_order",
-            (capsule_id,),
-        )
-        media_rows = await cursor.fetchall()
-        capsule["media"] = [dict(m) for m in media_rows]
-
-        # Record interaction
-        interaction_id = str(uuid.uuid4())
-        await db.execute(
-            """
-            INSERT INTO interactions (id, capsule_id, user_id, action)
-            VALUES (?, ?, NULL, 'open')
-            """,
-            (interaction_id, capsule_id),
-        )
-        await db.commit()
-
-        return capsule
-    finally:
-        await db.close()
-
-
-@router.post("/{capsule_id}/reply", status_code=201)
-async def reply_to_capsule(
-    capsule_id: str,
-    message: str = Form(..., min_length=10, max_length=500),
-    author_id: Optional[str] = Form(None),
-    photos: list[UploadFile] = File(default=[]),
-):
-    """Create a reply capsule at the same location."""
-    db = await get_db()
-    try:
-        # Get original capsule location
-        cursor = await db.execute(
-            "SELECT latitude, longitude FROM capsules WHERE id = ?",
-            (capsule_id,),
-        )
-        original = await cursor.fetchone()
-        if not original:
-            raise HTTPException(status_code=404, detail="Original capsule not found")
-
-        lat, lng = original[0], original[1]
-
-        # Create reply at same location
-        reply_id = str(uuid.uuid4())
-        geohash = encode(lat, lng)
-        await db.execute(
-            """
-            INSERT INTO capsules (id, author_id, latitude, longitude, geohash, message, visibility)
-            VALUES (?, ?, ?, ?, ?, ?, 'public')
-            """,
-            (reply_id, author_id, lat, lng, geohash, message),
-        )
-
-        # Handle photos via StorageService
-        for i, photo in enumerate(photos[:5]):
-            if not photo.filename and not photo.content_type:
-                continue
-            try:
-                result = await storage_service.save_photo(photo)
-            except HTTPException:
-                continue
-
-            media_id = str(uuid.uuid4())
-            await db.execute(
-                """
-                INSERT INTO media (id, capsule_id, type, url, thumbnail_url, sort_order)
-                VALUES (?, ?, 'photo', ?, ?, ?)
-                """,
-                (media_id, reply_id, result["url"], result["thumbnail_url"], i),
-            )
-
-        # Record interaction
-        interaction_id = str(uuid.uuid4())
-        await db.execute(
-            """
-            INSERT INTO interactions (id, capsule_id, user_id, action)
-            VALUES (?, ?, ?, 'reply')
-            """,
-            (interaction_id, capsule_id, author_id),
-        )
-
-        await db.commit()
-
-        # Fetch the created reply capsule with author info and media
-        cursor = await db.execute(
-            """
-            SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
-            FROM capsules c
-            LEFT JOIN users u ON c.author_id = u.id
-            WHERE c.id = ?
-            """,
-            (reply_id,),
-        )
-        row = await cursor.fetchone()
-        reply_capsule = _parse_capsule_row(dict(row))
-
-        # Fetch media
-        cursor = await db.execute(
-            "SELECT * FROM media WHERE capsule_id = ? ORDER BY sort_order",
-            (reply_id,),
-        )
-        media_rows = await cursor.fetchall()
-        reply_capsule["media"] = [dict(m) for m in media_rows]
-
-        return reply_capsule
-    finally:
-        await db.close()
-
 
 @router.get("/search")
 async def search_capsules(
@@ -645,34 +492,6 @@ async def get_capsule_by_share_token(share_token: str):
         await db.close()
 
 
-@router.post("/{capsule_id}/regenerate-share")
-async def regenerate_share_token(capsule_id: str):
-    """Regenerate share token for a capsule."""
-    db = await get_db()
-    try:
-        # Check if capsule exists
-        cursor = await db.execute(
-            "SELECT id FROM capsules WHERE id = ?", (capsule_id,)
-        )
-        row = await cursor.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Capsule not found")
-
-        # Generate new share token
-        new_share_token = _generate_share_token()
-        
-        # Update capsule with new share token
-        await db.execute(
-            "UPDATE capsules SET share_token = ? WHERE id = ?",
-            (new_share_token, capsule_id),
-        )
-        await db.commit()
-
-        return {"share_token": new_share_token}
-    finally:
-        await db.close()
-
-
 @router.get("/daily-recommend")
 async def get_daily_recommend():
     """Get today's recommended capsule based on date seed."""
@@ -760,5 +579,186 @@ async def get_daily_recommend():
             "expires_at": expires_at
         }
         
+    finally:
+        await db.close()
+
+@router.get("/{capsule_id}")
+async def get_capsule(capsule_id: str):
+    """Get capsule detail by ID. Auto-increments open_count."""
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            """
+            SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
+            FROM capsules c
+            LEFT JOIN users u ON c.author_id = u.id
+            WHERE c.id = ?
+            """,
+            (capsule_id,),
+        )
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Capsule not found")
+
+        capsule = _parse_capsule_row(dict(row))
+        
+        # Check if capsule is time-locked
+        unlock_at = capsule.get("unlock_at")
+        if unlock_at:
+            unlock_datetime = datetime.fromisoformat(unlock_at.replace("Z", "+00:00"))
+            current_datetime = datetime.utcnow()
+            
+            if unlock_datetime > current_datetime:
+                # Capsule is locked, return special response
+                countdown_seconds = int((unlock_datetime - current_datetime).total_seconds())
+                return {
+                    "locked": True,
+                    "unlock_at": unlock_at,
+                    "countdown_seconds": countdown_seconds
+                }
+
+        # Increment open_count for unlocked capsules
+        await db.execute(
+            "UPDATE capsules SET open_count = open_count + 1 WHERE id = ?",
+            (capsule_id,),
+        )
+        await db.commit()
+
+        # Fetch media
+        cursor = await db.execute(
+            "SELECT * FROM media WHERE capsule_id = ? ORDER BY sort_order",
+            (capsule_id,),
+        )
+        media_rows = await cursor.fetchall()
+        capsule["media"] = [dict(m) for m in media_rows]
+
+        # Record interaction
+        interaction_id = str(uuid.uuid4())
+        await db.execute(
+            """
+            INSERT INTO interactions (id, capsule_id, user_id, action)
+            VALUES (?, ?, NULL, 'open')
+            """,
+            (interaction_id, capsule_id),
+        )
+        await db.commit()
+
+        return capsule
+    finally:
+        await db.close()
+
+
+@router.post("/{capsule_id}/reply", status_code=201)
+async def reply_to_capsule(
+    capsule_id: str,
+    message: str = Form(..., min_length=10, max_length=500),
+    author_id: Optional[str] = Form(None),
+    photos: list[UploadFile] = File(default=[]),
+):
+    """Create a reply capsule at the same location."""
+    db = await get_db()
+    try:
+        # Get original capsule location
+        cursor = await db.execute(
+            "SELECT latitude, longitude FROM capsules WHERE id = ?",
+            (capsule_id,),
+        )
+        original = await cursor.fetchone()
+        if not original:
+            raise HTTPException(status_code=404, detail="Original capsule not found")
+
+        lat, lng = original[0], original[1]
+
+        # Create reply at same location
+        reply_id = str(uuid.uuid4())
+        geohash = encode(lat, lng)
+        await db.execute(
+            """
+            INSERT INTO capsules (id, author_id, latitude, longitude, geohash, message, visibility)
+            VALUES (?, ?, ?, ?, ?, ?, 'public')
+            """,
+            (reply_id, author_id, lat, lng, geohash, message),
+        )
+
+        # Handle photos via StorageService
+        for i, photo in enumerate(photos[:5]):
+            if not photo.filename and not photo.content_type:
+                continue
+            try:
+                result = await storage_service.save_photo(photo)
+            except HTTPException:
+                continue
+
+            media_id = str(uuid.uuid4())
+            await db.execute(
+                """
+                INSERT INTO media (id, capsule_id, type, url, thumbnail_url, sort_order)
+                VALUES (?, ?, 'photo', ?, ?, ?)
+                """,
+                (media_id, reply_id, result["url"], result["thumbnail_url"], i),
+            )
+
+        # Record interaction
+        interaction_id = str(uuid.uuid4())
+        await db.execute(
+            """
+            INSERT INTO interactions (id, capsule_id, user_id, action)
+            VALUES (?, ?, ?, 'reply')
+            """,
+            (interaction_id, capsule_id, author_id),
+        )
+
+        await db.commit()
+
+        # Fetch the created reply capsule with author info and media
+        cursor = await db.execute(
+            """
+            SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
+            FROM capsules c
+            LEFT JOIN users u ON c.author_id = u.id
+            WHERE c.id = ?
+            """,
+            (reply_id,),
+        )
+        row = await cursor.fetchone()
+        reply_capsule = _parse_capsule_row(dict(row))
+
+        # Fetch media
+        cursor = await db.execute(
+            "SELECT * FROM media WHERE capsule_id = ? ORDER BY sort_order",
+            (reply_id,),
+        )
+        media_rows = await cursor.fetchall()
+        reply_capsule["media"] = [dict(m) for m in media_rows]
+
+        return reply_capsule
+    finally:
+        await db.close()
+
+
+@router.post("/{capsule_id}/regenerate-share")
+async def regenerate_share_token(capsule_id: str):
+    """Regenerate share token for a capsule."""
+    db = await get_db()
+    try:
+        # Check if capsule exists
+        cursor = await db.execute(
+            "SELECT id FROM capsules WHERE id = ?", (capsule_id,)
+        )
+        row = await cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Capsule not found")
+
+        # Generate new share token
+        new_share_token = _generate_share_token()
+        
+        # Update capsule with new share token
+        await db.execute(
+            "UPDATE capsules SET share_token = ? WHERE id = ?",
+            (new_share_token, capsule_id),
+        )
+        await db.commit()
+
+        return {"share_token": new_share_token}
     finally:
         await db.close()
