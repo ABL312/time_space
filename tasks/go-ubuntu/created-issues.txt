@@ -1,0 +1,6 @@
+Go/Ubuntu 重构 01: Go 后端基础骨架与健康检查 -> https://github.com/ABL312/time_space/issues/45
+Go/Ubuntu 重构 02: 核心用户/胶囊 API 与 SQLite 查询优化 -> https://github.com/ABL312/time_space/issues/46
+Go/Ubuntu 重构 03: 媒体上传与静态文件服务 -> https://github.com/ABL312/time_space/issues/47
+Go/Ubuntu 重构 04: AI/推荐 fallback 与超时隔离 -> https://github.com/ABL312/time_space/issues/48
+Go/Ubuntu 重构 05: Ubuntu systemd/Nginx 部署文档与脚本 -> https://github.com/ABL312/time_space/issues/49
+Go/Ubuntu 重构 06: 前端契约联调与端到端验收 -> https://github.com/ABL312/time_space/issues/50
