@@ -238,6 +238,7 @@ class CapsuleService:
         self, lat: float, lng: float, radius: int = 1200,
         user_id: Optional[str] = None,
         scene_mood_match: Optional[str] = None,
+        limit: int = 50,
     ) -> dict:
         from ..repositories.user_repository import UserRepository
         user_repo = UserRepository()
@@ -269,8 +270,14 @@ class CapsuleService:
 
             recommended, others = rank_capsules(
                 capsules_raw, user_interest_tags,
-                scene_mood_match=scene_moods, top_n=3,
+                scene_mood_match=scene_moods, top_n=limit,
             )
+            
+            # Ensure total results don't exceed limit
+            if len(recommended) + len(others) > limit:
+                # If we have more results than limit, adjust the others list
+                remaining_limit = limit - len(recommended)
+                others = others[:remaining_limit]
 
             return {
                 "total": len(capsules_raw),

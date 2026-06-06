@@ -92,7 +92,7 @@ python scripts/performance_check.py
 🚀 Running API Latency Tests
 ==================================================
   ✅ PASS GET /api/health [200] 2.1ms (≤100ms)
-  ✅ PASS GET /api/capsules/nearby?lat=31.2304&lng=121.4737&radius=5000 [200] 45.2ms (≤300ms)
+  ✅ PASS GET /api/capsules/nearby?lat=31.2304&lng=121.4737&radius=5000&limit=50 [200] 45.2ms (≤300ms)
   ✅ PASS GET /api/capsules/search?q=test [200] 12.3ms (≤500ms)
   ✅ ACCEPTED_404 GET /api/capsules/daily-recommend [404] 8.7ms (≤500ms)
 

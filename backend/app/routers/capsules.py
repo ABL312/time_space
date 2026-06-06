@@ -68,6 +68,7 @@ async def get_nearby(
     return await capsule_service.get_nearby(
         lat=lat, lng=lng, radius=radius,
         user_id=user_id, scene_mood_match=scene_mood_match,
+        limit=limit,
     )
 
 
