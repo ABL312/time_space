@@ -1,9 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useEffect, lazy, Suspense } from 'react'
+import { useEffect, useState, lazy, Suspense } from 'react'
 import { useUserStore } from './stores/userStore'
 import { useTimeTheme } from './hooks/useTimeTheme'
 import LoadingState from './components/ui/LoadingState'
 import OfflineBanner from './components/ui/OfflineBanner'
+import AchievementUnlockPopup from './components/AchievementUnlockPopup'
+import type { Achievement } from './hooks/useAchievements'
 
 // Lazy-loaded pages for code splitting
 const HomePage = lazy(() => import('./pages/HomePage'))
@@ -30,6 +32,7 @@ function PageLoader() {
 function App() {
   const { user, loadUser, isLoading } = useUserStore()
   const theme = useTimeTheme()
+  const [unlockedAchievement, setUnlockedAchievement] = useState<Achievement | null>(null)
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -38,6 +41,15 @@ function App() {
   useEffect(() => {
     loadUser()
   }, [loadUser])
+
+  useEffect(() => {
+    const handleUnlock = (e: Event) => {
+      const ach = (e as CustomEvent).detail as Achievement
+      setUnlockedAchievement(ach)
+    }
+    window.addEventListener('achievement-unlocked', handleUnlock)
+    return () => window.removeEventListener('achievement-unlocked', handleUnlock)
+  }, [])
 
   // Register service worker for PWA support
   useEffect(() => {
@@ -118,6 +130,10 @@ function App() {
         </Routes>
         </main>
       </Suspense>
+      <AchievementUnlockPopup
+        achievement={unlockedAchievement}
+        onClose={() => setUnlockedAchievement(null)}
+      />
     </BrowserRouter>
   )
 }

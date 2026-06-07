@@ -112,8 +112,21 @@ export const useAchievements = () => {
   );
 
   const updateProgress = useCallback((open: number, create: number) => {
+    let prevList: Achievement[] = [];
+    try {
+      const saved = localStorage.getItem('achievements');
+      if (saved) prevList = JSON.parse(saved);
+    } catch { /* ignore */ }
+
     const updated = loadAchievements(open, create);
     setAchievements(updated);
+
+    updated.forEach(ach => {
+      const prevAch = prevList.find(p => p.id === ach.id);
+      if (prevAch && !prevAch.unlocked && ach.unlocked) {
+        window.dispatchEvent(new CustomEvent('achievement-unlocked', { detail: ach }));
+      }
+    });
   }, []);
 
   const recordCapsuleOpened = useCallback(() => {
@@ -134,12 +147,14 @@ export const useAchievements = () => {
     setAchievements(prev => {
       const updated = prev.map(ach => {
         if (ach.id === id && !ach.unlocked) {
-          return {
+          const unlockedAch = {
             ...ach,
             unlocked: true,
             unlockTime: Date.now(),
             progress: ach.target,
           };
+          window.dispatchEvent(new CustomEvent('achievement-unlocked', { detail: unlockedAch }));
+          return unlockedAch;
         }
         return ach;
       });
