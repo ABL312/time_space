@@ -29,6 +29,8 @@ export default function HomePage() {
   
   // Daily recommendation
   const [dailyRecommendation, setDailyRecommendation] = useState<Capsule | null>(null)
+  const [showDaily, setShowDaily] = useState(true)
+  const [dismissGPSWarning, setDismissGPSWarning] = useState(false)
   
   // Search states
   const [searchQuery, setSearchQuery] = useState('')
@@ -296,14 +298,37 @@ export default function HomePage() {
           )}
         </div>
 
+        {/* GPS Warning Card inside HUD */}
+        {locationSource === 'ip' && !dismissGPSWarning && (
+          <Card padding="sm" className="border-amber-500/20 bg-amber-500/5 flex items-start gap-2 rounded-lg max-w-sm relative z-[1000]">
+            <span className="text-sm">📍</span>
+            <div className="flex-1">
+              <p className="text-xs font-serif font-bold text-amber-700">建议开启 GPS 定位</p>
+              <p className="text-[10px] text-amber-600 font-serif mt-0.5 leading-relaxed">
+                当前正使用近似的 IP 定位。请开启手机 GPS 并使用安全的 HTTPS 连接访问，以获取精准的附近来信。
+              </p>
+            </div>
+            <button onClick={() => setDismissGPSWarning(true)} className="text-amber-500 hover:text-amber-700 text-xs font-bold px-1 cursor-pointer">
+              ×
+            </button>
+          </Card>
+        )}
+
         {/* Daily Recommendation Float Panel */}
-        {dailyRecommendation && !searchResults.length && (
+        {dailyRecommendation && !searchResults.length && showDaily && (
           <Card
             padding="md"
             interactive
             onClick={() => navigate(`/capsule/${dailyRecommendation.id}`)}
-            className="hover:border-primary/40 transition-colors border-primary/10 bg-bg/90 backdrop-blur-sm shadow-md rounded-lg max-w-sm"
+            className="relative hover:border-primary/40 transition-colors border-primary/10 bg-bg/90 backdrop-blur-sm shadow-md rounded-lg max-w-sm"
           >
+            <button 
+              onClick={(e) => { e.stopPropagation(); setShowDaily(false) }} 
+              className="absolute top-2 right-2 text-text-muted hover:text-primary text-xs px-1 cursor-pointer"
+              title="关闭推荐"
+            >
+              ×
+            </button>
             <div className="flex items-center gap-2 mb-1.5">
               <Badge variant="signal" className="font-serif">💌 今日推荐来信</Badge>
             </div>
@@ -319,19 +344,6 @@ export default function HomePage() {
             )}
           </Card>
         )}
-      </div>
-
-      {/* ── MOBILE MENU TRIGGER (Only on mobile viewports) ── */}
-      <div className="flex sm:hidden absolute top-4 right-4 z-[1000]">
-        <Button
-          variant="icon"
-          size="icon-md"
-          onClick={() => setIsMenuOpen(true)}
-          title="时光菜单"
-          className="hud bg-bg/95 border border-primary/20 text-primary rounded-full hover:bg-surface shadow-sm"
-        >
-          📖
-        </Button>
       </div>
 
       {/* ── TOP-RIGHT DESKTOP ACTIONS ── */}
@@ -361,7 +373,7 @@ export default function HomePage() {
       </div>
 
       {/* ── FLOATING ACTION BUTTONS (Lower-middle-right to avoid overlaps) ── */}
-      <div className="absolute right-4 bottom-28 z-[1001] flex flex-col gap-3">
+      <div className="absolute right-4 bottom-32 sm:bottom-28 z-[1001] flex flex-col gap-3">
         {/* AR Explore Button */}
         <Button
           variant="icon"
@@ -437,6 +449,8 @@ export default function HomePage() {
             { label: '我的收藏', path: '/favorites', color: 'text-primary', icon: '❤️' },
             { label: '时光勋章', action: () => { setIsMenuOpen(false); setIsAchievementPanelOpen(true) }, color: 'text-primary', icon: '🏅' },
             { label: '我的信箱', path: '/mine', color: 'text-primary', icon: '✉️' },
+            { label: cap.shouldSkipAR ? '寻找信件' : '开启AR空间', action: () => { setIsMenuOpen(false); handleExplore() }, color: 'text-primary', icon: cap.shouldSkipAR ? '📁' : '👁️' },
+            { label: '写信留念', path: '/create', color: 'text-primary', icon: '✍️' },
           ].map((item) => (
             <button
               key={item.label}

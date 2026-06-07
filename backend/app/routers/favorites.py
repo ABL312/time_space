@@ -81,7 +81,7 @@ async def remove_favorite(
     
     return {"message": "Capsule removed from favorites"}
 
-@router.get("/", response_model=List[CapsuleResponse], summary="Get user's favorite capsules")
+@router.get("", response_model=List[CapsuleResponse], summary="Get user's favorite capsules")
 async def get_favorites(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db)
