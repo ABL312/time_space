@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useCallback } from 'react';
 
 export interface Achievement {
   id: string;
@@ -56,14 +56,6 @@ const ACHIEVEMENTS: Omit<Achievement, 'unlocked' | 'unlockTime' | 'progress'>[] 
   },
 ];
 
-function loadAchievements(): Achievement[] {
-  try {
-    const saved = localStorage.getItem('achievements');
-    if (saved) return JSON.parse(saved);
-  } catch { /* ignore */ }
-  return ACHIEVEMENTS.map(ach => ({ ...ach, unlocked: false, progress: 0 }));
-}
-
 function loadCount(key: string): number {
   try {
     const saved = localStorage.getItem(key);
@@ -72,79 +64,89 @@ function loadCount(key: string): number {
   return 0;
 }
 
+function loadAchievements(openCount: number, createCount: number): Achievement[] {
+  let list: Achievement[];
+  try {
+    const saved = localStorage.getItem('achievements');
+    list = saved ? JSON.parse(saved) : ACHIEVEMENTS.map(ach => ({ ...ach, unlocked: false, progress: 0 }));
+  } catch {
+    list = ACHIEVEMENTS.map(ach => ({ ...ach, unlocked: false, progress: 0 }));
+  }
+
+  let changed = false;
+  const aligned = list.map(ach => {
+    let progress = ach.progress;
+    if (['first-exploration', 'curious', 'story-collector', 'exploration-master'].includes(ach.id)) {
+      progress = Math.min(openCount, ach.target);
+    } else if (['sharer', 'prolific-creator'].includes(ach.id)) {
+      progress = Math.min(createCount, ach.target);
+    }
+
+    const shouldUnlock = progress >= ach.target;
+    const isUnlocked = ach.unlocked;
+
+    if (progress !== ach.progress || (shouldUnlock && !isUnlocked)) {
+      changed = true;
+      return {
+        ...ach,
+        progress,
+        unlocked: shouldUnlock ? true : ach.unlocked,
+        unlockTime: shouldUnlock && !isUnlocked ? (ach.unlockTime || Date.now()) : ach.unlockTime
+      };
+    }
+    return { ...ach, progress };
+  });
+
+  if (changed) {
+    localStorage.setItem('achievements', JSON.stringify(aligned));
+  }
+  return aligned;
+}
+
 export const useAchievements = () => {
-  const [achievements, setAchievements] = useState<Achievement[]>(loadAchievements);
   const [capsuleOpenCount, setCapsuleOpenCount] = useState(() => loadCount('capsuleOpenCount'));
   const [capsuleCreateCount, setCapsuleCreateCount] = useState(() => loadCount('capsuleCreateCount'));
-  const prevAchievementsRef = useRef(achievements);
+  
+  const [achievements, setAchievements] = useState<Achievement[]>(() => 
+    loadAchievements(loadCount('capsuleOpenCount'), loadCount('capsuleCreateCount'))
+  );
 
-  // 计算派生成就状态
-  const computedAchievements = useMemo(() => {
-    return achievements.map(achievement => {
-      let progress = achievement.progress;
+  const updateProgress = useCallback((open: number, create: number) => {
+    const updated = loadAchievements(open, create);
+    setAchievements(updated);
+  }, []);
 
-      if (achievement.id.includes('exploration') || achievement.id.includes('curious')) {
-        progress = Math.min(capsuleOpenCount, achievement.target);
-      } else if (achievement.id.includes('sharer') || achievement.id.includes('creator')) {
-        progress = Math.min(capsuleCreateCount, achievement.target);
-      }
-
-      if (progress >= achievement.target && !achievement.unlocked) {
-        return { ...achievement, progress, unlocked: true, unlockTime: achievement.unlockTime ?? 0 };
-      }
-
-      return { ...achievement, progress };
-    });
-  }, [achievements, capsuleOpenCount, capsuleCreateCount]);
-
-  // 持久化成就变化
-  useEffect(() => {
-    // 深比较：检查是否真的有变化
-    const prev = prevAchievementsRef.current;
-    const hasChanges = JSON.stringify(prev) !== JSON.stringify(computedAchievements);
-    
-    if (hasChanges) {
-      // Stamp real unlock timestamps for newly unlocked achievements
-      const stamped = computedAchievements.map(a =>
-        a.unlocked && a.unlockTime === 0 ? { ...a, unlockTime: Date.now() } : a
-      );
-      prevAchievementsRef.current = stamped;
-      localStorage.setItem('achievements', JSON.stringify(stamped));
-      // 注意：不再调用 setAchievements，避免无限循环
-    }
-  }, [computedAchievements]);
-
-  // 记录打开胶囊
-  const recordCapsuleOpened = () => {
-    const newCount = capsuleOpenCount + 1;
+  const recordCapsuleOpened = useCallback(() => {
+    const newCount = loadCount('capsuleOpenCount') + 1;
     setCapsuleOpenCount(newCount);
     localStorage.setItem('capsuleOpenCount', newCount.toString());
-  };
+    updateProgress(newCount, loadCount('capsuleCreateCount'));
+  }, [updateProgress]);
 
-  // 记录创建胶囊
-  const recordCapsuleCreated = () => {
-    const newCount = capsuleCreateCount + 1;
+  const recordCapsuleCreated = useCallback(() => {
+    const newCount = loadCount('capsuleCreateCount') + 1;
     setCapsuleCreateCount(newCount);
     localStorage.setItem('capsuleCreateCount', newCount.toString());
-  };
+    updateProgress(loadCount('capsuleOpenCount'), newCount);
+  }, [updateProgress]);
 
-  // 手动解锁成就（用于测试）
-  const unlockAchievement = (id: string) => {
-    const updatedAchievements = achievements.map(achievement => {
-      if (achievement.id === id && !achievement.unlocked) {
-        return {
-          ...achievement,
-          unlocked: true,
-          unlockTime: Date.now(),
-          progress: achievement.target,
-        };
-      }
-      return achievement;
+  const unlockAchievement = useCallback((id: string) => {
+    setAchievements(prev => {
+      const updated = prev.map(ach => {
+        if (ach.id === id && !ach.unlocked) {
+          return {
+            ...ach,
+            unlocked: true,
+            unlockTime: Date.now(),
+            progress: ach.target,
+          };
+        }
+        return ach;
+      });
+      localStorage.setItem('achievements', JSON.stringify(updated));
+      return updated;
     });
-
-    setAchievements(updatedAchievements);
-    localStorage.setItem('achievements', JSON.stringify(updatedAchievements));
-  };
+  }, []);
 
   return {
     achievements,

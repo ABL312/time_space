@@ -321,6 +321,19 @@ export default function HomePage() {
         )}
       </div>
 
+      {/* ── MOBILE MENU TRIGGER (Only on mobile viewports) ── */}
+      <div className="flex sm:hidden absolute top-4 right-4 z-[1000]">
+        <Button
+          variant="icon"
+          size="icon-md"
+          onClick={() => setIsMenuOpen(true)}
+          title="时光菜单"
+          className="hud bg-bg/95 border border-primary/20 text-primary rounded-full hover:bg-surface shadow-sm"
+        >
+          📖
+        </Button>
+      </div>
+
       {/* ── TOP-RIGHT DESKTOP ACTIONS ── */}
       <div className="hidden sm:flex absolute top-4 right-4 z-[1000] items-center gap-3">
         <Button variant="icon" size="icon-md" onClick={() => navigate('/profile')} title="个人中心" className="hud bg-bg/95 border border-primary/20 text-primary rounded-full hover:bg-surface shadow-sm">

@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useGeolocation } from '../hooks/useGeolocation'
 import { useUserStore } from '../stores/userStore'
 import { capsulesApi, aiApi, getErrorMessage } from '../lib/api'
+import { useAchievements } from '../hooks/useAchievements'
 import { EMOTION_TAGS } from '../types'
 import { PageShell, Card, Badge, Button, SectionLabel } from '../components/ui'
 
@@ -11,6 +12,7 @@ export default function CreatePage() {
   const [searchParams] = useSearchParams()
   const replyTo = searchParams.get('reply_to')
   const { user } = useUserStore()
+  const { recordCapsuleCreated } = useAchievements()
   const { latitude: rawLat, longitude: rawLng, error: geoError } = useGeolocation()
   const latitude = rawLat ?? 31.0282
   const longitude = rawLng ?? 121.4346
@@ -153,6 +155,7 @@ export default function CreatePage() {
         await capsulesApi.reply(replyTo, fd)
       } else {
         await capsulesApi.create(fd)
+        recordCapsuleCreated()
       }
       navigate('/')
     } catch (err: unknown) { setError(getErrorMessage(err, '创建失败')) }

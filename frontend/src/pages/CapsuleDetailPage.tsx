@@ -6,6 +6,7 @@ import { responsesApi, favoritesApi } from '../lib/api'
 import { getErrorMessage } from '../lib/client'
 import type { Capsule, CapsuleResponse } from '../types'
 import { useUserStore } from '../stores/userStore'
+import { useAchievements } from '../hooks/useAchievements'
 import { QRCodeSVG } from 'qrcode.react'
 import { Card, Badge, Button, SectionLabel, LoadingState as UILoadingState, ErrorState as UIErrorState, EmptyState } from '../components/ui'
 
@@ -15,6 +16,8 @@ export default function CapsuleDetailPage() {
   const { selectedCapsule, fetchCapsule, isLoadingDetail } = useCapsuleStore()
   const { cacheResponse, getCached } = useOfflineCache()
   const { user } = useUserStore()
+  const { recordCapsuleOpened } = useAchievements()
+  const openedRecordedRef = useRef<string | null>(null)
   const [decoded, setDecoded] = useState(false)
   const [fetchError, setFetchError] = useState<string | null>(null)
   
@@ -71,6 +74,15 @@ export default function CapsuleDetailPage() {
         .catch((err) => console.error('Failed to fetch favorite status:', err))
     }
   }, [id, user, selectedCapsule])
+
+  useEffect(() => {
+    if (selectedCapsule && (!timeLockData || !timeLockData.locked)) {
+      if (openedRecordedRef.current !== selectedCapsule.id) {
+        openedRecordedRef.current = selectedCapsule.id
+        recordCapsuleOpened()
+      }
+    }
+  }, [selectedCapsule, timeLockData, recordCapsuleOpened])
 
   useEffect(() => {
     if (!selectedCapsule?.unlock_at) return
