@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from ..database import get_db
 from ..models import CapsuleResponse
+from ..auth import get_current_user
 
 router = APIRouter(prefix="/api/favorites", tags=["favorites"])
 
@@ -20,9 +21,10 @@ class FavoriteStatusResponse(BaseModel):
 @router.post("/{capsule_id}", summary="Bookmark a capsule")
 async def add_favorite(
     capsule_id: str,
-    user_id: str,
+    current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db)
 ):
+    user_id = current_user["id"]
     """Add a capsule to user's favorites."""
     # Check if capsule exists
     async with db.execute(
@@ -57,9 +59,10 @@ async def add_favorite(
 @router.delete("/{capsule_id}", summary="Remove a capsule from favorites")
 async def remove_favorite(
     capsule_id: str,
-    user_id: str,
+    current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db)
 ):
+    user_id = current_user["id"]
     """Remove a capsule from user's favorites."""
     # Check if favorited
     async with db.execute(
@@ -80,9 +83,10 @@ async def remove_favorite(
 
 @router.get("/", response_model=List[CapsuleResponse], summary="Get user's favorite capsules")
 async def get_favorites(
-    user_id: str,
+    current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db)
 ):
+    user_id = current_user["id"]
     """Get all capsules favorited by a user."""
     capsules = []
     async with db.execute(
@@ -145,9 +149,10 @@ async def get_favorites(
 @router.get("/capsules/{capsule_id}/favorite-status", response_model=FavoriteStatusResponse, summary="Check if a capsule is favorited")
 async def get_favorite_status(
     capsule_id: str,
-    user_id: str,
+    current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db)
 ):
+    user_id = current_user["id"]
     """Check if a capsule is favorited by a user."""
     # Check if capsule exists
     async with db.execute(

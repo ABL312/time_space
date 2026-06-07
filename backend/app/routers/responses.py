@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from ..database import get_db
 from ..models import ResponseModel, ResponseCreateModel
+from ..auth import get_current_user
 
 router = APIRouter(prefix="/api/capsules/{capsule_id}/responses", tags=["responses"])
 
@@ -18,6 +19,7 @@ router = APIRouter(prefix="/api/capsules/{capsule_id}/responses", tags=["respons
 async def add_response(
     capsule_id: str,
     response_data: ResponseCreateModel,
+    current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db)
 ):
     """Add a response to a specific capsule."""
@@ -40,7 +42,7 @@ async def add_response(
         (
             response_id,
             capsule_id,
-            response_data.user_id,
+            current_user["id"],
             response_data.nickname,
             response_data.content,
             created_at

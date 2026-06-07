@@ -73,7 +73,7 @@ class LocationService:
         place_category = geocode_data.get("category", "")
         
         # 2. Generate description
-        description = self._generate_description(name, place_type)
+        description = await self._generate_description(name, place_type)
         
         # 3. Query nearby capsule count
         nearby_capsule_count = await self._get_nearby_capsule_count(lat, lng)
@@ -148,16 +148,17 @@ class LocationService:
     async def _get_nearby_capsule_count(self, lat: float, lng: float) -> int:
         """Get count of nearby capsules using geohash service."""
         # Import here to avoid circular imports
-        from ..database import get_db
+        from ..database import get_db_conn
         
+        db = await get_db_conn()
         try:
-            db = await get_db()
             nearby_capsules = await find_nearby_capsules(db, lat, lng, limit=100)
-            await db.close()
             return len(nearby_capsules)
         except Exception as e:
             print(f"⚠️ Error getting nearby capsule count: {e}")
             return 0
+        finally:
+            await db.close()
 
     def _infer_moods(self, place_type: str, place_name: str) -> List[str]:
         """Infer mood tags from place type/name keywords."""
@@ -178,7 +179,7 @@ class LocationService:
         # Default moods
         return ["温暖", "希望"]
 
-    def _generate_description(self, place_name: str, place_type: str) -> str:
+    async def _generate_description(self, place_name: str, place_type: str) -> str:
         """Generate location description. GPT if available, else template."""
         # Check if we have an OpenAI API key
         api_key = os.getenv("OPENAI_API_KEY", "")
@@ -196,12 +197,12 @@ class LocationService:
         # If we have an API key, try to generate a more detailed description with GPT
         if api_key:
             try:
-                from openai import OpenAI
-                client = OpenAI(api_key=api_key)
+                from openai import AsyncOpenAI
+                client = AsyncOpenAI(api_key=api_key)
                 
                 prompt = f"为以下地点生成一段富有诗意和情感的中文描述（不超过50字）：{place_name}。这是一个{place_type}类型的地点。"
                 
-                response = client.chat.completions.create(
+                response = await client.chat.completions.create(
                     model="gpt-4o-mini",
                     messages=[{"role": "user", "content": prompt}],
                     max_tokens=100,

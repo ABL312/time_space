@@ -5,11 +5,13 @@ import uuid
 import json
 from typing import Optional, List
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Form
+from fastapi import APIRouter, HTTPException, Form, Depends
 
+import aiosqlite
 from ..database import get_db
 from ..models import CapsuleResponse
 from ..services.geohash_service import encode
+from ..auth import get_current_user
 
 router = APIRouter(prefix="/api/collections", tags=["collections"])
 
@@ -30,9 +32,8 @@ def _parse_collection_row(row: dict) -> dict:
 
 
 @router.get("")
-async def get_collections():
+async def get_collections(db: aiosqlite.Connection = Depends(get_db)):
     """Get list of collections."""
-    db = await get_db()
     try:
         cursor = await db.execute(
             """
@@ -56,11 +57,13 @@ async def create_collection(
     title: str = Form(...),
     description: Optional[str] = Form(None),
     cover_image: Optional[str] = Form(None),
-    creator_id: Optional[str] = Form(None),
     capsule_ids: str = Form(...),  # JSON array string
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
 ):
     """Create a new collection."""
     collection_id = str(uuid.uuid4())
+    creator_id = current_user["id"]
     
     # Parse capsule_ids
     try:
@@ -69,8 +72,6 @@ async def create_collection(
             raise ValueError("capsule_ids must be a JSON array")
     except (json.JSONDecodeError, TypeError, ValueError) as e:
         raise HTTPException(status_code=400, detail=f"Invalid capsule_ids format: {str(e)}")
-    
-    db = await get_db()
     try:
         await db.execute(
             """
@@ -95,9 +96,8 @@ async def create_collection(
 
 
 @router.get("/{collection_id}")
-async def get_collection(collection_id: str):
+async def get_collection(collection_id: str, db: aiosqlite.Connection = Depends(get_db)):
     """Get collection detail by ID, including capsule list."""
-    db = await get_db()
     try:
         # Fetch collection
         cursor = await db.execute(
@@ -167,17 +167,21 @@ async def update_collection(
     description: Optional[str] = Form(None),
     cover_image: Optional[str] = Form(None),
     capsule_ids: Optional[str] = Form(None),  # JSON array string
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
 ):
     """Update collection."""
-    db = await get_db()
     try:
-        # Check if collection exists
+        # Check if collection exists and user is creator
         cursor = await db.execute(
-            "SELECT id FROM collections WHERE id = ?", (collection_id,)
+            "SELECT id, creator_id FROM collections WHERE id = ?", (collection_id,)
         )
         row = await cursor.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Collection not found")
+            
+        if row["creator_id"] and row["creator_id"] != current_user["id"]:
+            raise HTTPException(status_code=403, detail="Only the creator can update this collection")
         
         # Build update query dynamically
         updates = []
@@ -230,9 +234,8 @@ async def update_collection(
 
 
 @router.post("/{collection_id}/view")
-async def increment_collection_views(collection_id: str):
+async def increment_collection_views(collection_id: str, db: aiosqlite.Connection = Depends(get_db)):
     """Increment collection view count."""
-    db = await get_db()
     try:
         # Check if collection exists
         cursor = await db.execute(

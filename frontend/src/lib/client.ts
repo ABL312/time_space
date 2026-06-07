@@ -33,11 +33,13 @@ export async function request<T>(
 ): Promise<T> {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  const token = localStorage.getItem('timespace_user_token')
 
   try {
     const res = await fetch(`${BASE_URL}${url}`, {
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
         ...options?.headers,
       },
       ...options,
@@ -79,11 +81,15 @@ export async function upload<T>(
 ): Promise<T> {
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+  const token = localStorage.getItem('timespace_user_token')
 
   try {
     const res = await fetch(`${BASE_URL}${url}`, {
       method: 'POST',
       body: formData,
+      headers: {
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
       signal: controller.signal,
     })
 

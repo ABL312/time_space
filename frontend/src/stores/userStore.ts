@@ -32,11 +32,15 @@ export const useUserStore = create<UserState>((set) => ({
 
   setUser: (user) => {
     localStorage.setItem(STORAGE_KEY, user.id)
+    if (user.token) {
+      localStorage.setItem('timespace_user_token', user.token)
+    }
     set({ user, error: null })
   },
 
   clearUser: () => {
     localStorage.removeItem(STORAGE_KEY)
+    localStorage.removeItem('timespace_user_token')
     set({ user: null })
   },
 
@@ -53,6 +57,7 @@ export const useUserStore = create<UserState>((set) => ({
       set({ user, isLoading: false })
     } catch {
       localStorage.removeItem(STORAGE_KEY)
+      localStorage.removeItem('timespace_user_token')
       set({ user: null, isLoading: false })
     }
   },

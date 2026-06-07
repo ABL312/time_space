@@ -54,52 +54,52 @@ export default function CreatePage() {
   const removePhoto = (index: number) => setPhotos((prev) => prev.filter((_, i) => i !== index))
 
   const startRecording = useCallback(async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-        const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' })
-        const chunks: Blob[] = []
-        mr.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
-        mr.onstop = () => {
-          setVoiceBlob(new Blob(chunks, { type: 'audio/webm' }))
-          stream.getTracks().forEach((t) => t.stop())
-        }
-        mr.start()
-        mediaRecorderRef.current = mr
-        setIsRecording(true)
-        setTimeout(() => { if (mr.state === 'recording') { mr.stop(); setIsRecording(false) } }, 60000)
-      } catch { setError('无法访问麦克风') }
-    }, [])
-
-    const startSampleRecording = useCallback(async () => {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-        const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' })
-        const chunks: Blob[] = []
-        mr.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
-        mr.onstop = () => {
-          setVoiceSampleBlob(new Blob(chunks, { type: 'audio/webm' }))
-          stream.getTracks().forEach((t) => t.stop())
-        }
-        mr.start()
-        voiceSampleRecorderRef.current = mr
-        setIsSampleRecording(true)
-        setTimeout(() => { if (mr.state === 'recording') { mr.stop(); setIsSampleRecording(false) } }, 10000)
-      } catch { setError('无法访问麦克风') }
-    }, [])
-
-    const stopRecording = useCallback(() => {
-      if (mediaRecorderRef.current?.state === 'recording') {
-        mediaRecorderRef.current.stop()
-        setIsRecording(false)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+      const chunks: Blob[] = []
+      mr.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
+      mr.onstop = () => {
+        setVoiceBlob(new Blob(chunks, { type: 'audio/webm' }))
+        stream.getTracks().forEach((t) => t.stop())
       }
-    }, [])
+      mr.start()
+      mediaRecorderRef.current = mr
+      setIsRecording(true)
+      setTimeout(() => { if (mr.state === 'recording') { mr.stop(); setIsRecording(false) } }, 60000)
+    } catch { setError('无法访问麦克风') }
+  }, [])
 
-    const stopSampleRecording = useCallback(() => {
-      if (voiceSampleRecorderRef.current?.state === 'recording') {
-        voiceSampleRecorderRef.current.stop()
-        setIsSampleRecording(false)
+  const startSampleRecording = useCallback(async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const mr = new MediaRecorder(stream, { mimeType: 'audio/webm' })
+      const chunks: Blob[] = []
+      mr.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data) }
+      mr.onstop = () => {
+        setVoiceSampleBlob(new Blob(chunks, { type: 'audio/webm' }))
+        stream.getTracks().forEach((t) => t.stop())
       }
-    }, [])
+      mr.start()
+      voiceSampleRecorderRef.current = mr
+      setIsSampleRecording(true)
+      setTimeout(() => { if (mr.state === 'recording') { mr.stop(); setIsSampleRecording(false) } }, 10000)
+    } catch { setError('无法访问麦克风') }
+  }, [])
+
+  const stopRecording = useCallback(() => {
+    if (mediaRecorderRef.current?.state === 'recording') {
+      mediaRecorderRef.current.stop()
+      setIsRecording(false)
+    }
+  }, [])
+
+  const stopSampleRecording = useCallback(() => {
+    if (voiceSampleRecorderRef.current?.state === 'recording') {
+      voiceSampleRecorderRef.current.stop()
+      setIsSampleRecording(false)
+    }
+  }, [])
 
   const handleVoiceClone = async () => {
     if (!voiceSampleBlob) { 
@@ -129,53 +129,53 @@ export default function CreatePage() {
   }
 
   const handleSubmit = async () => {
-      if (!canSubmit || !latitude || !longitude) return
-      if (!user) { setError('请先登录'); return }
-      if (useTimeLock && !unlockAt) { setError('请选择解锁时间'); return }
-      setIsSubmitting(true)
-      setError(null)
-      try {
-        const fd = new FormData()
-        fd.append('author_id', user.id)
-        fd.append('message', message)
-        fd.append('latitude', String(latitude))
-        fd.append('longitude', String(longitude))
-        fd.append('visibility', visibility)
-        if (moodTags.length > 0) fd.append('mood_tag', moodTags[0])
-        if (useTimeLock && unlockAt) {
-          const unlockDate = new Date(unlockAt)
-          fd.append('unlock_at', unlockDate.toISOString())
-        }
-        photos.forEach((p) => fd.append('photos', p))
-        if (voiceBlob) fd.append('voice', voiceBlob, 'recording.webm')
-        if (voiceCloneUrl) fd.append('voice_clone_url', voiceCloneUrl)
-        if (replyTo) {
-          await capsulesApi.reply(replyTo, fd)
-        } else {
-          await capsulesApi.create(fd)
-        }
-        navigate('/')
-      } catch (err: unknown) { setError(getErrorMessage(err, '创建失败')) }
-      finally { setIsSubmitting(false) }
-    }
+    if (!canSubmit || !latitude || !longitude) return
+    if (!user) { setError('请先登录'); return }
+    if (useTimeLock && !unlockAt) { setError('请选择解锁时间'); return }
+    setIsSubmitting(true)
+    setError(null)
+    try {
+      const fd = new FormData()
+      fd.append('author_id', user.id)
+      fd.append('message', message)
+      fd.append('latitude', String(latitude))
+      fd.append('longitude', String(longitude))
+      fd.append('visibility', visibility)
+      if (moodTags.length > 0) fd.append('mood_tag', moodTags[0])
+      if (useTimeLock && unlockAt) {
+        const unlockDate = new Date(unlockAt)
+        fd.append('unlock_at', unlockDate.toISOString())
+      }
+      photos.forEach((p) => fd.append('photos', p))
+      if (voiceBlob) fd.append('voice', voiceBlob, 'recording.webm')
+      if (voiceCloneUrl) fd.append('voice_clone_url', voiceCloneUrl)
+      if (replyTo) {
+        await capsulesApi.reply(replyTo, fd)
+      } else {
+        await capsulesApi.create(fd)
+      }
+      navigate('/')
+    } catch (err: unknown) { setError(getErrorMessage(err, '创建失败')) }
+    finally { setIsSubmitting(false) }
+  }
 
   return (
-    <PageShell title="DEPLOY CAPSULE" backTo={-1}>
-      <div className="max-w-lg mx-auto px-4 py-6 pb-28 space-y-6 stagger">
+    <PageShell title="书写岁月来信" backTo={-1}>
+      <div className="max-w-lg mx-auto px-4 py-6 pb-28 space-y-6 stagger font-serif">
 
         {/* GPS */}
         <section>
-          <SectionLabel>LOCATION_LOCK</SectionLabel>
-          <Card variant="default" padding="sm" className="mt-2">
+          <SectionLabel>📍 定位锁定</SectionLabel>
+          <Card padding="sm" className="mt-2 border-primary/15 bg-surface/30">
             {latitude && longitude ? (
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-mono text-text-primary">{latitude.toFixed(6)}°N</span>
-                <span className="text-sm font-mono text-text-primary">{longitude.toFixed(6)}°E</span>
-                <Badge variant="success" dot>LOCKED</Badge>
+              <div className="flex items-center justify-between text-sm text-text-primary">
+                <span>纬度: {latitude.toFixed(6)}°N</span>
+                <span>经度: {longitude.toFixed(6)}°E</span>
+                <Badge variant="success" className="font-serif font-bold">已锁定此地</Badge>
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <Badge variant="warning" dot>{geoError || 'Acquiring position...'}</Badge>
+                <Badge variant="warning" className="font-serif">{geoError || '正在获取当前物理位置...'}</Badge>
               </div>
             )}
           </Card>
@@ -183,38 +183,38 @@ export default function CreatePage() {
 
         {/* MESSAGE */}
         <section>
-          <SectionLabel>MESSAGE_PAYLOAD</SectionLabel>
+          <SectionLabel>✉️ 来信内容</SectionLabel>
           <textarea
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            placeholder="写下你想留在这里的话..."
+            placeholder="在此刻的角落写下你想留给岁月的话，或者给后来路过此地之人的私语..."
             maxLength={500}
-            rows={5}
-            className="mt-2 w-full px-4 py-3 bg-surface border border-border rounded-[var(--radius-md)] text-white placeholder-slate-600 focus:outline-none focus:border-signal transition-colors resize-none text-sm leading-relaxed"
+            rows={6}
+            className="mt-2 w-full px-4 py-3 bg-bg border border-primary/20 rounded-md text-text-primary placeholder-text-muted focus:outline-none focus:border-primary transition-all resize-none text-sm leading-relaxed font-serif"
           />
-          <div className="flex justify-between mt-1">
-            <span className={`text-xs font-mono ${message.length < 10 ? 'text-data-warn' : 'text-data-good'}`}>
-              {message.length < 10 ? `MIN ${10 - message.length} CHARS MORE` : 'VALID'}
+          <div className="flex justify-between mt-1 text-xs">
+            <span className={message.length < 10 ? 'text-data-warn' : 'text-data-good'}>
+              {message.length < 10 ? `还差至少 ${10 - message.length} 个字` : '字数符合要求'}
             </span>
-            <span className="text-xs font-mono text-text-tertiary">{message.length}/500</span>
+            <span className="text-text-muted">{message.length}/500</span>
           </div>
         </section>
 
         {/* PHOTOS */}
         <section>
-          <SectionLabel>PHOTO_ARCHIVE [max 5]</SectionLabel>
-          <div className="flex flex-wrap gap-2 mt-2">
+          <SectionLabel>📸 附信照片 (最多 5 张)</SectionLabel>
+          <div className="flex flex-wrap gap-2.5 mt-2">
             {photos.map((photo, i) => (
-              <div key={i} className="relative w-20 h-20 border border-border rounded-[var(--radius-sm)] overflow-hidden">
+              <div key={i} className="relative w-20 h-20 border border-primary/10 rounded-md overflow-hidden bg-primary/5 shadow-sm">
                 <img src={URL.createObjectURL(photo)} alt="" className="w-full h-full object-cover" />
                 <button onClick={() => removePhoto(i)}
-                  className="absolute top-0.5 right-0.5 w-4 h-4 bg-data-bad/90 text-white text-[10px] flex items-center justify-center rounded-full">×</button>
+                  className="absolute top-1 right-1 w-4 h-4 bg-red-500/90 text-white text-[10px] flex items-center justify-center rounded-full cursor-pointer">×</button>
               </div>
             ))}
             {photos.length < 5 && (
               <button onClick={() => fileInputRef.current?.click()}
-                className="w-20 h-20 border border-dashed border-surface-light rounded-[var(--radius-sm)] flex items-center justify-center text-slate-500 hover:border-signal hover:text-signal transition-colors">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                className="w-20 h-20 border border-dashed border-primary/20 rounded-md flex items-center justify-center text-text-muted hover:border-primary hover:text-primary transition-colors cursor-pointer bg-surface/10">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                 </svg>
               </button>
@@ -225,60 +225,60 @@ export default function CreatePage() {
 
         {/* VOICE */}
         <section>
-          <SectionLabel>VOICE_RECORD [optional, max 60s]</SectionLabel>
+          <SectionLabel>🎙️ 录制原声 (可选，最长60秒)</SectionLabel>
           {voiceBlob ? (
-            <Card variant="default" padding="sm" className="mt-2 flex items-center gap-3">
+            <Card padding="sm" className="mt-2 flex items-center gap-3 border-primary/15 bg-surface/30">
               <audio src={URL.createObjectURL(voiceBlob)} controls className="flex-1 h-8" />
-              <Button variant="danger" size="sm" onClick={() => setVoiceBlob(null)}>CLEAR</Button>
+              <Button variant="danger" size="sm" onClick={() => setVoiceBlob(null)} className="font-serif text-xs">清除</Button>
             </Card>
           ) : (
             <Button
               variant={isRecording ? 'danger' : 'secondary'}
               size="lg"
               onClick={isRecording ? stopRecording : startRecording}
-              className="w-full mt-2 font-mono tracking-wider"
+              className="w-full mt-2 font-serif font-bold text-sm py-3 cursor-pointer"
             >
-              {isRecording ? 'STOP RECORDING' : 'START RECORDING'}
+              {isRecording ? '⏹️ 结束录音' : '🎙️ 开始录音'}
             </Button>
           )}
         </section>
 
         {/* VOICE CLONE */}
         <section>
-          <SectionLabel>AI_VOICE_CLONE [optional]</SectionLabel>
-          <Card variant="default" padding="md" className="mt-2 space-y-4">
-            <p className="text-sm text-text-secondary">上传 10 秒语音样本，AI 将用你的声音朗读留言</p>
+          <SectionLabel>🗣️ AI 语音克隆朗读 (可选)</SectionLabel>
+          <Card padding="md" className="mt-2 space-y-4 border-primary/15 bg-surface/30">
+            <p className="text-xs text-text-secondary leading-relaxed">提供一段 10 秒的语音样本，AI 将用你的模拟声音朗读信件内容。</p>
             
             {/* Sample Recording */}
             <div>
-              <SectionLabel>语音样本录制 [10秒]</SectionLabel>
+              <SectionLabel className="text-[10px] text-primary">录制 10 秒语音样本</SectionLabel>
               {voiceSampleBlob ? (
                 <div className="flex items-center gap-3 mt-2">
                   <audio src={URL.createObjectURL(voiceSampleBlob)} controls className="flex-1 h-8" />
-                  <Button variant="danger" size="sm" onClick={() => setVoiceSampleBlob(null)}>CLEAR</Button>
+                  <Button variant="danger" size="sm" onClick={() => setVoiceSampleBlob(null)} className="font-serif text-xs">清除</Button>
                 </div>
               ) : (
                 <Button
                   variant={isSampleRecording ? 'danger' : 'secondary'}
                   size="lg"
                   onClick={isSampleRecording ? stopSampleRecording : startSampleRecording}
-                  className="w-full mt-2 font-mono tracking-wider"
+                  className="w-full mt-2 font-serif font-bold text-xs py-2.5 cursor-pointer"
                 >
-                  {isSampleRecording ? 'STOP RECORDING' : 'START RECORDING'}
+                  {isSampleRecording ? '⏹️ 结束样本录制' : '🎙️ 开始样本录制 (10秒)'}
                 </Button>
               )}
             </div>
             
             {/* Text Input */}
             <div>
-              <SectionLabel>朗读文本</SectionLabel>
+              <SectionLabel className="text-[10px] text-primary">朗读文本</SectionLabel>
               <textarea
                 value={cloneText}
                 onChange={(e) => setCloneText(e.target.value)}
-                placeholder={message || "输入要朗读的文字..."}
+                placeholder={message || "若留空，AI将默认朗读上方的信件正文..."}
                 maxLength={500}
                 rows={3}
-                className="mt-2 w-full px-3 py-2 bg-surface border border-border rounded-[var(--radius-md)] text-white placeholder-slate-600 focus:outline-none focus:border-signal transition-colors resize-none text-sm"
+                className="mt-2 w-full px-3 py-2 bg-bg border border-primary/20 rounded-md text-text-primary placeholder-text-muted focus:outline-none focus:border-primary transition-all resize-none text-xs font-serif"
               />
             </div>
             
@@ -289,22 +289,22 @@ export default function CreatePage() {
               onClick={handleVoiceClone}
               disabled={!voiceSampleBlob || isCloning}
               loading={isCloning}
-              className="w-full font-mono tracking-wider"
+              className="w-full font-serif font-bold text-xs py-2.5 cursor-pointer"
             >
-              GENERATE CLONED VOICE
+              生成模拟声音
             </Button>
             
             {/* Preview */}
             {voiceCloneUrl && (
-              <div className="pt-2 border-t border-border">
-                <SectionLabel>预览</SectionLabel>
-                <audio src={voiceCloneUrl} controls className="w-full mt-2" />
+              <div className="pt-3 border-t border-primary/10">
+                <SectionLabel className="text-[10px] text-primary">模拟语音预览</SectionLabel>
+                <audio src={voiceCloneUrl} controls className="w-full mt-2 h-10" />
               </div>
             )}
             
             {/* Error */}
             {error && !message.includes(error) && (
-              <p className="text-xs font-mono text-data-bad text-center">{error}</p>
+              <p className="text-xs text-data-bad text-center">{error}</p>
             )}
           </Card>
         </section>
@@ -312,22 +312,24 @@ export default function CreatePage() {
         {/* MOOD TAGS */}
         <section>
           <div className="flex items-center justify-between mb-2">
-            <SectionLabel>EMOTION_TAGS</SectionLabel>
-            <span className="text-xs font-mono text-text-tertiary">{moodTags.length}/3</span>
+            <SectionLabel>🏷️ 选择情感标签 (最多 3 个)</SectionLabel>
+            <span className="text-xs text-text-muted">{moodTags.length}/3</span>
           </div>
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-2">
             {EMOTION_TAGS.map((tag) => {
               const sel = moodTags.includes(tag)
               return (
-                <Button
+                <button
                   key={tag}
-                  variant={sel ? 'primary' : 'ghost'}
-                  size="sm"
                   onClick={() => toggleMoodTag(tag)}
-                  className={`font-mono ${sel ? '' : 'border border-border'}`}
+                  className={`px-3 py-1.5 text-xs font-serif rounded-full border transition-all cursor-pointer ${
+                    sel 
+                      ? 'border-primary bg-primary text-white font-bold' 
+                      : 'border-primary/20 bg-bg text-text-secondary hover:border-primary/50'
+                  }`}
                 >
                   {tag}
-                </Button>
+                </button>
               )
             })}
           </div>
@@ -335,14 +337,14 @@ export default function CreatePage() {
 
         {/* TIME LOCK */}
         <section>
-          <SectionLabel>TIME_LOCK</SectionLabel>
-          <Card variant="default" padding="md" className="mt-2 space-y-4">
+          <SectionLabel>🔒 时空信锁</SectionLabel>
+          <Card padding="md" className="mt-2 space-y-4 border-primary/15 bg-surface/30">
             <div className="flex items-center justify-between">
-              <span className="text-sm text-text-primary">设置开启时间</span>
+              <span className="text-sm text-text-primary">设置未来的开启日期</span>
               <button
                 onClick={() => setUseTimeLock(!useTimeLock)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                  useTimeLock ? 'bg-signal' : 'bg-surface-light'
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
+                  useTimeLock ? 'bg-primary' : 'bg-primary/20'
                 }`}
               >
                 <span
@@ -354,19 +356,19 @@ export default function CreatePage() {
             </div>
 
             {useTimeLock && (
-              <div className="pt-2 border-t border-border">
-                <label className="block text-xs font-mono text-text-tertiary mb-2">
-                  解锁时间 (至少明天)
+              <div className="pt-2 border-t border-primary/10">
+                <label className="block text-xs text-text-secondary mb-2">
+                  设定解锁时间 (必须是一天之后)
                 </label>
                 <input
                   type="datetime-local"
                   value={unlockAt}
                   onChange={(e) => setUnlockAt(e.target.value)}
                   min={getMinUnlockTime()}
-                  className="w-full px-3 py-2 bg-surface border border-border rounded-[var(--radius-md)] text-white focus:outline-none focus:border-signal transition-colors text-sm"
+                  className="w-full px-3 py-2 bg-bg border border-primary/20 rounded-md text-text-primary focus:outline-none focus:border-primary transition-all text-sm font-sans"
                 />
-                <p className="mt-2 text-xs text-text-muted">
-                  胶囊将在设定的时间自动解锁，之前无法查看内容
+                <p className="mt-2 text-xs text-text-muted leading-relaxed">
+                  开启此项后，来信将被时空锁封存，在设定的日期到达前，任何人都无法查看和阅读该信件内容。
                 </p>
               </div>
             )}
@@ -375,40 +377,45 @@ export default function CreatePage() {
 
         {/* VISIBILITY */}
         <section>
-          <SectionLabel>ACCESS_LEVEL</SectionLabel>
-          <div className="flex gap-1.5 mt-2">
+          <SectionLabel>👁️ 查看权限</SectionLabel>
+          <div className="flex gap-2 mt-2">
             {([
-              { value: 'public' as const, label: 'PUBLIC' },
-              { value: 'private' as const, label: 'PRIVATE' },
-              { value: 'link_only' as const, label: 'LINK ONLY' },
+              { value: 'public' as const, label: '公开可见' },
+              { value: 'private' as const, label: '私密来信' },
+              { value: 'link_only' as const, label: '仅限链接' },
             ]).map((opt) => (
               <Button
                 key={opt.value}
                 variant={visibility === opt.value ? 'primary' : 'ghost'}
                 size="sm"
                 onClick={() => setVisibility(opt.value)}
-                className={`flex-1 font-mono tracking-wider ${visibility === opt.value ? '' : 'border border-border'}`}
+                className={`flex-1 font-serif font-bold text-xs py-2 rounded-md ${visibility === opt.value ? '' : 'border border-primary/20 bg-bg text-text-secondary'}`}
               >
                 {opt.label}
               </Button>
             ))}
           </div>
+          <p className="mt-2 text-xs text-text-muted leading-relaxed">
+            {visibility === 'public' && '公开：任何人在地图上路过此地时，都可发现并开启此信。'}
+            {visibility === 'private' && '私密：仅你自己，或当在信件中指定了收信人ID时收信人可见。'}
+            {visibility === 'link_only' && '仅限链接：地图上不公开显示此信，仅持有该信件私密链接的人可查看。'}
+          </p>
         </section>
 
         {/* ERROR */}
-        {error && <p className="text-xs font-mono text-data-bad text-center">{error}</p>}
+        {error && <p className="text-xs text-data-bad text-center">{error}</p>}
 
         {/* DEPLOY */}
-        <div className="border-t border-border-subtle my-4" />
+        <div className="border-t border-primary/10 my-4" />
         <Button
           variant="capsule"
           size="lg"
           onClick={handleSubmit}
           disabled={!canSubmit || isSubmitting}
           loading={isSubmitting}
-          className="w-full font-mono tracking-widest"
+          className="w-full font-serif font-bold py-3.5 text-sm"
         >
-          DEPLOY CAPSULE
+          封存并寄出时空信件
         </Button>
       </div>
     </PageShell>

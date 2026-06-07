@@ -9,7 +9,7 @@ import { useOnline } from '../hooks/useOnline'
 import { aiApi } from '../lib/api'
 import { getErrorMessage } from '../lib/client'
 import type { ARSceneLayout } from '../types'
-import { Badge, Button } from '../components/ui'
+import { Button } from '../components/ui'
 import ARScene from '../components/ARScene'
 
 type SmartARAnchor = {
@@ -122,32 +122,33 @@ export default function ARPage() {
   // ══════════════════════════════════════════
   if (cap.isReady && cap.shouldSkipAR) {
     return (
-      <div className="min-h-screen bg-bg page-in">
-        <header className="sticky top-0 z-30 hud px-4 py-3 flex items-center justify-between">
-          <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="flex items-center gap-2 text-slate-400 hover:text-signal transition-colors">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <div className="min-h-screen bg-bg page-in font-serif">
+        <header className="sticky top-0 z-30 bg-bg/85 backdrop-blur-xl border-b border-primary/10 px-4 py-3 flex items-center justify-between">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/')} className="flex items-center gap-2 text-primary hover:bg-surface rounded-full transition-colors py-1.5 px-3">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
             </svg>
-            <span className="text-xs font-mono tracking-wider">RETURN</span>
+            <span className="text-xs font-bold font-serif">返回地图</span>
           </Button>
-          <span className="label">SCAN MODE</span>
+          <span className="text-sm font-bold text-text-primary">寻信列表</span>
           <div className="w-16" />
         </header>
 
         {/* Degradation notice */}
-        <div className="mx-4 mt-4 p-2.5 hud border-data-warn/20 flex items-center gap-2">
-          <div className="w-1.5 h-1.5 bg-data-warn breathe" />
-          <span className="data text-data-warn">
-            {!cap.hasCamera && !cap.hasWebGL ? 'AR UNAVAILABLE — LIST VIEW ACTIVE' :
-             !cap.hasCamera ? 'CAMERA OFFLINE — LIST VIEW ACTIVE' :
-             'RENDERER OFFLINE — LIST VIEW ACTIVE'}
+        <div className="mx-4 mt-4 p-3 border border-primary/15 bg-surface/30 rounded-md flex items-center gap-2">
+          <div className="w-2 h-2 bg-primary rounded-full animate-pulse" />
+          <span className="text-xs text-text-secondary">
+            {!cap.hasCamera && !cap.hasWebGL ? 'AR 空间渲染不可用 — 已切换至列表寻信' :
+             !cap.hasCamera ? '相机启动失败 — 已切换至列表寻信' :
+             '空间渲染引擎离线 — 已切换至列表寻信'}
           </span>
         </div>
 
         {/* Offline banner */}
         {!isOnline && (
-          <div className="mx-4 mt-2 p-2.5 hud border-data-bad/20 flex items-center gap-2">
-            <Badge variant="error" dot>OFFLINE — SCANNING CACHED DATA</Badge>
+          <div className="mx-4 mt-2 p-3 border border-red-500/10 bg-red-500/5 rounded-md flex items-center gap-2">
+            <span className="w-1.5 h-1.5 bg-red-500 rounded-full" />
+            <span className="text-xs text-data-bad">处于离线状态 (显示本地缓存信件)</span>
           </div>
         )}
 
@@ -155,52 +156,48 @@ export default function ARPage() {
         <div className="px-4 py-4">
           {capsules.length === 0 ? (
             <div className="py-16 text-center">
-              <div className="label text-slate-600 mb-2">NO SIGNAL</div>
-              <p className="data">No capsules detected in range</p>
+              <div className="text-sm font-bold text-text-secondary mb-2">📬 静待回音</div>
+              <p className="text-xs text-text-muted">当前范围内未探寻到时空来信</p>
             </div>
           ) : (
-            <div className="space-y-1.5 stagger">
+            <div className="space-y-3 stagger">
               {capsules.map((c) => (
                 <button
                   key={c.id}
                   onClick={() => navigate(`/capsule/${c.id}`)}
-                  className="w-full text-left row-hover p-3 rounded-[var(--radius-md)] border border-border bg-surface hover:border-border-active transition-colors"
+                  className="w-full text-left flex overflow-hidden rounded-md border border-primary/15 bg-surface/30 hover:border-primary/30 hover:bg-surface/50 transition-colors cursor-pointer p-3"
                 >
                   <div className="flex items-start gap-3">
                     {/* Signal indicator */}
-                    <div className="relative flex-shrink-0 w-10 h-10 border border-border flex items-center justify-center">
+                    <div className="relative flex-shrink-0 w-10 h-10 border border-primary/15 rounded-md bg-primary/5 flex items-center justify-center">
                       {c.match_score != null && c.match_score > 60 ? (
-                        <div className="w-2.5 h-2.5 bg-signal breathe" />
+                        <span className="text-lg">💌</span>
                       ) : (
-                        <div className="w-2 h-2 bg-slate-600" />
-                      )}
-                      {c.match_score != null && c.match_score > 60 && (
-                        <div className="absolute -top-px -right-px px-1 bg-signal/90">
-                          <span className="text-[8px] font-mono font-bold text-void">{Math.round(c.match_score)}</span>
-                        </div>
+                        <span className="text-lg">✉️</span>
                       )}
                     </div>
 
                     {/* Content */}
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs text-slate-200 truncate mb-1">{c.message?.slice(0, 50)}</p>
-                      <div className="flex flex-wrap gap-1 mb-1">
+                      <p className="text-xs text-text-primary font-serif line-clamp-2 leading-relaxed mb-2">{c.message}</p>
+                      <div className="flex flex-wrap gap-1.5 mb-2">
                         {c.emotion_tags?.slice(0, 3).map((t) => (
-                          <span key={t} className="data text-[9px] text-primary-light border border-primary/15 px-1">{t}</span>
+                          <span key={t} className="text-[10px] text-primary border border-primary/10 bg-primary/5 px-2 py-0.5 rounded-full">{t}</span>
                         ))}
                       </div>
-                      <div className="flex items-center gap-3">
-                        {c.distance_m != null && <span className="data text-[9px]">{Math.round(c.distance_m)}m</span>}
-                        <span className="data text-[9px]">OPENED {c.open_count}x</span>
+                      <div className="flex items-center gap-3 text-[10px] text-text-muted">
+                        {c.distance_m != null && <span>📍 距你 {Math.round(c.distance_m)}米</span>}
+                        <span>•</span>
+                        <span>已被开启 {c.open_count} 次</span>
                       </div>
                       {c.match_reasons?.[0] && (
-                        <p className="data text-[9px] text-signal/60 mt-0.5 truncate">{c.match_reasons[0]}</p>
+                        <p className="text-[10px] text-primary font-bold mt-1.5">💡 {c.match_reasons[0]}</p>
                       )}
                     </div>
 
                     {/* Thumbnail */}
                     {c.media?.[0] && (
-                      <div className="w-12 h-12 flex-shrink-0 border border-border overflow-hidden">
+                      <div className="w-12 h-12 flex-shrink-0 border border-primary/10 rounded-md overflow-hidden bg-primary/5 shadow-sm">
                         <img src={c.media[0].thumbnail_url || c.media[0].url} alt="" className="w-full h-full object-cover" loading="lazy" />
                       </div>
                     )}
@@ -215,9 +212,9 @@ export default function ARPage() {
         <div className="fixed bottom-5 left-4 right-4 z-20">
           <button
             onClick={() => navigate('/create')}
-            className="w-full py-3 border border-capsule/25 bg-capsule/5 text-capsule text-xs font-mono tracking-wider rounded-[var(--radius-md)] hover:bg-capsule/10 transition-colors"
+            className="w-full py-3.5 bg-primary text-white border border-primary/20 text-sm font-bold font-serif tracking-wider rounded-md hover:bg-primary-dark shadow-md transition-colors cursor-pointer"
           >
-            + DEPLOY CAPSULE
+            ✍️ 书写一封时空来信
           </button>
         </div>
       </div>
@@ -228,7 +225,7 @@ export default function ARPage() {
   // NORMAL AR MODE
   // ══════════════════════════════════════════
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-black">
+    <div className="relative h-screen w-screen overflow-hidden bg-black font-serif">
       {/* Camera */}
       <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 w-full h-full object-contain bg-black" />
 
@@ -238,12 +235,11 @@ export default function ARPage() {
           onCapsuleClick={(id) => navigate(`/capsule/${id}`)} />
       )}
 
-      {/* Vision-assisted stable AR card. This is the main AR path: normal
-          camera + Qwen-VL layout, without WebXR/ARCore dependency. */}
+      {/* Vision-assisted stable AR card */}
       {smartLayout && smartPose && smartPrimaryCapsule && (
         <div className="absolute inset-0 z-[16] pointer-events-none">
           <div
-            className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-capsule/35 bg-capsule/10 blur-[0.2px] transition-[left,top,width,height,opacity] duration-300 ease-out"
+            className="absolute -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/35 bg-primary/10 blur-[0.2px] transition-[left,top,width,height,opacity] duration-300 ease-out"
             style={{
               left: `${smartPose.shadowLeft}%`,
               top: `${smartPose.shadowTop}%`,
@@ -254,7 +250,7 @@ export default function ARPage() {
           />
           <button
             onClick={() => navigate(`/capsule/${smartPrimaryCapsule.id}`)}
-            className="absolute pointer-events-auto -translate-x-1/2 -translate-y-1/2 transition-[left,top,transform,opacity] duration-200 ease-out"
+            className="absolute pointer-events-auto -translate-x-1/2 -translate-y-1/2 transition-[left,top,transform,opacity] duration-200 ease-out cursor-pointer"
             style={{
               left: `${smartPose.left}%`,
               top: `${smartPose.top}%`,
@@ -262,20 +258,20 @@ export default function ARPage() {
               transform: `translate(-50%, -50%) perspective(760px) rotateX(${smartPose.rotateX}deg) rotateY(${smartPose.rotateY}deg) scale(${smartPose.scale})`,
             }}
           >
-            <div className="relative w-[15rem] max-w-[72vw] overflow-hidden rounded-2xl border border-capsule/45 bg-gradient-to-b from-slate-950/80 via-void/78 to-black/85 p-4 text-center shadow-[0_0_35px_rgba(245,166,35,0.32)] backdrop-blur-md">
-              <div className="absolute inset-x-6 top-0 h-px bg-capsule/70" />
-              <div className="mb-2 text-[11px] font-mono tracking-[0.28em] text-capsule">智能 AR</div>
-              <p className="mb-2 text-sm font-semibold text-slate-100">附近胶囊</p>
-              <p className="mb-3 line-clamp-3 text-xs leading-relaxed text-slate-100">{smartPrimaryCapsule.message || '时空信箱内容'}</p>
+            <div className="relative w-[15rem] max-w-[72vw] overflow-hidden rounded-2xl border border-primary/40 bg-bg/95 p-4 text-center shadow-lg backdrop-blur-md">
+              <div className="absolute inset-x-6 top-0 h-0.5 bg-primary/60" />
+              <div className="mb-1.5 text-[10px] uppercase tracking-wider text-primary font-bold">寻信 AR 锚定</div>
+              <p className="mb-2 text-sm font-bold text-text-primary">附近来信</p>
+              <p className="mb-3 line-clamp-3 text-xs leading-relaxed text-text-secondary">{smartPrimaryCapsule.message}</p>
               <div className="mb-3 flex flex-wrap justify-center gap-1.5">
                 {smartSecondaryCapsules.map((capsule) => (
-                  <span key={capsule.id} className="rounded-full border border-capsule/20 bg-capsule/10 px-2 py-0.5 text-[9px] text-amber-100">
-                    {capsule.distance_m != null ? `${Math.round(capsule.distance_m)}m` : '附近'}
+                  <span key={capsule.id} className="rounded-full border border-primary/20 bg-primary/5 px-2 py-0.5 text-[9px] text-primary font-bold">
+                    📍 {capsule.distance_m != null ? `${Math.round(capsule.distance_m)}米` : '附近'}
                   </span>
                 ))}
               </div>
-              <div className="rounded-lg border border-white/10 bg-black/20 px-2 py-1 text-[10px] text-slate-300">
-                {smartLayout.ground_visible ? '场景锚定 · 跟随镜头远近变化' : '屏幕锚定 · 跟随镜头方向变化'}
+              <div className="rounded-lg border border-primary/10 bg-surface/50 px-2 py-1 text-[10px] text-text-secondary">
+                {smartLayout.ground_visible ? '🌱 场景锚定 · 随镜头近远拉伸' : '📱 屏幕锚定 · 随镜头转动变化'}
               </div>
             </div>
           </button>
@@ -285,7 +281,7 @@ export default function ARPage() {
               <button
                 key={capsule.id}
                 onClick={() => navigate(`/capsule/${capsule.id}`)}
-                className="absolute pointer-events-auto -translate-x-1/2 -translate-y-1/2 rounded-xl border border-capsule/25 bg-void/55 px-2.5 py-1.5 text-[9px] text-slate-200 shadow-[0_0_18px_rgba(245,166,35,0.18)] backdrop-blur-sm transition-[left,top,transform,opacity] duration-200 ease-out"
+                className="absolute pointer-events-auto -translate-x-1/2 -translate-y-1/2 rounded-md border border-primary/20 bg-bg/90 px-2.5 py-1.5 text-[10px] text-text-primary shadow-md backdrop-blur-sm transition-[left,top,transform,opacity] duration-200 ease-out cursor-pointer"
                 style={{
                   left: `${ghostPose.left}%`,
                   top: `${ghostPose.top}%`,
@@ -293,39 +289,33 @@ export default function ARPage() {
                   transform: `translate(-50%, -50%) scale(${ghostPose.scale})`,
                 }}
               >
-                {capsule.distance_m != null ? `${Math.round(capsule.distance_m)}m` : '附近'} · 胶囊
+                📬 {capsule.distance_m != null ? `${Math.round(capsule.distance_m)}米` : '附近'} · 时空信件
               </button>
             )
           })}
         </div>
       )}
 
-      {/* Visible AR markers over the camera feed. Three.js still renders the
-          spatial scene, but these markers guarantee users can see detected
-          capsules even when compass heading is unavailable or noisy. */}
+      {/* Visible AR markers over the camera feed */}
       {primaryCapsule && primaryMarker && !smartLayout && (
         <div className="absolute inset-0 z-[15] pointer-events-none">
           <button
             key={primaryCapsule.id}
             onClick={() => navigate(`/capsule/${primaryCapsule.id}`)}
-            className="absolute pointer-events-auto -translate-x-1/2 -translate-y-1/2 group transition-[left,top,opacity] duration-200 ease-out"
+            className="absolute pointer-events-auto -translate-x-1/2 -translate-y-1/2 group transition-[left,top,opacity] duration-200 ease-out cursor-pointer"
             style={{ left: `${primaryMarker.left}%`, top: `${primaryMarker.top}%`, opacity: primaryMarker.opacity }}
           >
             <div className="relative flex flex-col items-center">
-              <div className="absolute inset-0 -m-2 rounded-full border border-capsule/25 animate-ping" />
-              <div className="relative w-11 h-11 rounded-full border border-capsule/55 bg-void/35 backdrop-blur-sm shadow-[0_0_20px_rgba(245,166,35,0.35)] flex items-center justify-center">
-                <div className="w-5 h-5 text-capsule">
-                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
-                  </svg>
-                </div>
+              <div className="absolute inset-0 -m-2 rounded-full border border-primary/30 animate-ping" />
+              <div className="relative w-11 h-11 rounded-full border border-primary/40 bg-bg/90 shadow-md flex items-center justify-center text-xl">
+                💌
               </div>
-              <div className="mt-1.5 max-w-[7rem] px-1.5 py-1 rounded-[var(--radius-sm)] border border-capsule/20 bg-void/60 backdrop-blur-sm text-center">
-                <p className="text-[9px] font-mono text-capsule truncate">
-                  {primaryCapsule.distance_m != null ? `${Math.round(primaryCapsule.distance_m)}m` : 'CAPSULE'}
+              <div className="mt-2 max-w-[8rem] px-2 py-1 rounded border border-primary/20 bg-bg/95 shadow-sm text-center">
+                <p className="text-[10px] font-bold text-primary font-serif">
+                  {primaryCapsule.distance_m != null ? `📍 ${Math.round(primaryCapsule.distance_m)}米` : '时空来信'}
                 </p>
-                <p className="text-[9px] text-slate-200 truncate">
-                  {primaryCapsule.message?.slice(0, 12) || '时空胶囊'}
+                <p className="text-[9px] text-text-secondary truncate font-serif">
+                  {primaryCapsule.message || '时空来信'}
                 </p>
               </div>
             </div>
@@ -334,70 +324,69 @@ export default function ARPage() {
       )}
 
       {/* HUD Top */}
-      <div className="absolute top-0 left-0 right-0 p-3 flex justify-between items-start z-20">
-        <button onClick={() => navigate('/')} className="hud px-3 py-2 text-xs font-mono tracking-wider text-slate-300 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-[var(--radius-sm)] hover:text-white transition-colors" aria-label="Return to map">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <div className="absolute top-0 left-0 right-0 p-4 flex justify-between items-start z-20">
+        <button onClick={() => navigate('/')} className="px-3 py-2 text-xs font-serif font-bold text-text-primary bg-bg/95 border border-primary/20 shadow-sm min-h-[44px] min-w-[44px] flex items-center justify-center rounded-full hover:bg-surface transition-colors cursor-pointer" aria-label="返回地图">
+          <svg className="w-5 h-5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
           </svg>
         </button>
         <div className="flex items-center gap-2">
-          {!isOnline && <Badge variant="error" dot className="animate-pulse">OFFLINE</Badge>}
+          {!isOnline && <span className="px-2 py-1 text-[10px] bg-red-500 text-white rounded-md font-bold animate-pulse">离线</span>}
           <button
             onClick={scanSmartAR}
             disabled={!cameraReady || smartScanning}
-            className="hud px-3 py-2 text-xs font-mono tracking-wider text-capsule rounded-[var(--radius-sm)] hover:bg-capsule/10 transition-colors disabled:opacity-50"
+            className="px-3.5 py-2 text-xs font-serif font-bold text-primary bg-bg/95 border border-primary/20 shadow-sm rounded-full hover:bg-surface transition-colors disabled:opacity-50 cursor-pointer"
           >
-            {smartScanning ? 'SCANNING' : '智能 AR'}
+            {smartScanning ? '⏳ 正在寻信...' : '🔍 寻信 AR'}
           </button>
-          <div className="hud px-3 py-2 flex items-center gap-2">
-            <div className="w-1.5 h-1.5 bg-signal breathe" />
-            <span className="data-value text-xs font-mono">
-              {orientation.alpha != null ? `${Math.round(orientation.alpha)}°` : '---'}
-            </span>
+          <div className="px-3 py-2 bg-bg/95 border border-primary/20 shadow-sm rounded-full flex items-center gap-1.5 text-xs text-text-secondary font-sans font-medium">
+            <span className="w-1.5 h-1.5 bg-primary rounded-full animate-ping" />
+            <span>{orientation.alpha != null ? `${Math.round(orientation.alpha)}°` : '---'}</span>
           </div>
         </div>
       </div>
 
       {/* HUD Bottom */}
-      <div className="absolute bottom-0 left-0 right-0 p-3 pb-7 z-20">
-        <div className="hud p-3">
-          <div className="flex items-center justify-between mb-1.5">
-            <span className="label">AR SCAN</span>
-            <span className="data-value text-xs font-mono">{capsules.length} DETECTED</span>
+      <div className="absolute bottom-0 left-0 right-0 p-4 pb-8 z-20">
+        <div className="bg-bg/95 border border-primary/20 shadow-lg rounded-lg p-4 backdrop-blur-sm">
+          <div className="flex items-center justify-between mb-1.5 border-b border-primary/10 pb-1.5 text-xs font-bold text-text-primary">
+            <span>空间扫描模式</span>
+            <span className="text-primary font-bold">已探寻到 {capsules.length} 封信件</span>
           </div>
-          <p className="data text-slate-500 mb-1">
-            {smartLayout ? smartLayout.atmosphere : '点击“智能 AR”扫描场景，把附近胶囊锚定到画面中'}
+          <p className="text-xs text-text-secondary leading-relaxed mb-3">
+            {smartLayout ? smartLayout.atmosphere : '点击“寻信 AR”扫描环境，把这片虚空里的时空来信锚定到当前画画中。'}
           </p>
-          {smartError && <p className="data text-data-warn mb-1">{smartError}</p>}
+          {smartError && <p className="text-xs text-data-bad mb-2">{smartError}</p>}
           {capsules.length > 0 ? (
-            <div className="flex gap-1.5 overflow-x-auto">
+            <div className="flex gap-2 overflow-x-auto no-scrollbar py-0.5">
               {capsules.slice(0, 3).map((c) => (
                 <button key={c.id} onClick={() => navigate(`/capsule/${c.id}`)}
-                  className="flex-shrink-0 px-2.5 py-1.5 border border-border text-[10px] text-slate-300 row-hover font-mono rounded-[var(--radius-sm)] hover:border-border-active transition-colors">
-                  {c.message?.slice(0, 15)}
+                  className="flex-shrink-0 px-3 py-1.5 border border-primary/15 bg-surface/30 rounded-md text-[10px] text-text-primary hover:border-primary hover:bg-surface transition-colors cursor-pointer">
+                  ✉️ {c.message?.slice(0, 15)}...
                 </button>
               ))}
             </div>
           ) : (
-            <p className="data">Rotate device to scan for capsules</p>
+            <p className="text-[11px] text-text-muted">环顾四周以寻觅漂浮的时空来信...</p>
           )}
           {orientation.error && (
-            <p className="data text-data-warn mt-1">{orientation.error}</p>
+            <p className="text-xs text-data-bad mt-2">{orientation.error}</p>
           )}
         </div>
       </div>
 
       {/* Camera error overlay */}
       {cameraError && (
-        <div className="absolute inset-0 flex items-center justify-center bg-void/90 z-30">
-          <div className="text-center p-6 decode-in">
-            <div className="label text-data-bad mb-3">CAMERA OFFLINE</div>
-            <p className="data mb-1">{cameraError}</p>
-            <p className="data text-slate-600 mb-6">Switching to list-based scan mode</p>
+        <div className="absolute inset-0 flex items-center justify-center bg-bg/95 z-30 font-serif">
+          <div className="text-center p-6 max-w-sm">
+            <span className="text-4xl block mb-3">📸</span>
+            <h3 className="text-lg font-bold text-text-primary mb-2">相机无法使用</h3>
+            <p className="text-xs text-text-secondary leading-relaxed mb-1">{cameraError}</p>
+            <p className="text-xs text-text-muted mb-6">正在为你切换至列表寻信模式</p>
             <div className="flex gap-3 justify-center">
-              <button onClick={() => navigate('/')} className="px-4 py-2 border border-border text-slate-400 text-xs font-mono tracking-wider rounded-[var(--radius-sm)] hover:border-border-active transition-colors">MAP</button>
+              <button onClick={() => navigate('/')} className="px-4 py-2 border border-primary/20 text-primary text-xs font-bold rounded-md hover:bg-surface cursor-pointer">返回地图</button>
               {capsules.length > 0 && (
-                <button onClick={() => navigate(`/capsule/${capsules[0].id}`)} className="px-4 py-2 border border-signal/30 text-signal text-xs font-mono tracking-wider rounded-[var(--radius-sm)] hover:bg-signal/10 transition-colors">BROWSE</button>
+                <button onClick={() => navigate(`/capsule/${capsules[0].id}`)} className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-md hover:bg-primary-dark shadow-sm cursor-pointer">浏览来信</button>
               )}
             </div>
           </div>
@@ -407,8 +396,8 @@ export default function ARPage() {
       {/* iOS gyro permission */}
       {(orientation.error || !orientation.isSupported) && (
         <button onClick={orientation.requestPermission}
-          className="absolute top-16 left-1/2 -translate-x-1/2 hud px-4 py-2 text-xs text-signal font-mono tracking-wider z-20 rounded-[var(--radius-sm)] hover:bg-signal/5 transition-colors">
-          ENABLE GYROSCOPE
+          className="absolute top-20 left-1/2 -translate-x-1/2 px-4 py-2.5 bg-primary text-white border border-primary/20 shadow-md text-xs font-bold rounded-full hover:bg-primary-dark transition-colors cursor-pointer z-20">
+          🧭 开启设备陀螺仪定位
         </button>
       )}
     </div>
@@ -521,6 +510,7 @@ function getSmartARGhostPose(pose: ReturnType<typeof getSmartARPose>, index: num
   }
 }
 
+// Depth profile helper
 function getDepthProfile(depthHint: string) {
   if (depthHint === 'near') return { scale: 1.12, parallax: 0.74, pitch: 0.58, shadow: 0.92 }
   if (depthHint === 'far') return { scale: 0.72, parallax: 0.38, pitch: 0.3, shadow: 0.58 }
@@ -572,8 +562,8 @@ function createFallbackSmartLayout(capsuleCount: number): ARSceneLayout {
     },
     safe_zones: [{ x: 0.32, y: 0.56, width: 0.36, height: 0.28, reason: '稳定的屏幕下方展示区域' }],
     avoid_zones: [],
-    atmosphere: '视觉识别暂时不可用，已使用稳定的屏幕下方摆放方案',
-    blessing_copy: capsuleCount > 1 ? `这里有 ${capsuleCount} 个附近胶囊` : '这里有 1 个附近胶囊',
+    atmosphere: '场景分析服务暂不可用，已自动在正前方展开时空信件',
+    blessing_copy: capsuleCount > 1 ? `这里有 ${capsuleCount} 封附近来信` : '这里有 1 封附近来信',
     confidence: 0.45,
     source: 'frontend_fallback',
   }

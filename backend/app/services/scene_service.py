@@ -46,14 +46,14 @@ class SceneService:
     async def _analyze_with_gpt(self, image_bytes: bytes) -> Optional[Dict]:
         """Call GPT-4o with vision, return scene analysis."""
         import httpx
-        from openai import OpenAI
+        from openai import AsyncOpenAI
         
         # Convert image to base64
         image_base64 = base64.b64encode(image_bytes).decode('utf-8')
         
-        client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+        client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model="gpt-4o",
             messages=[
                 {

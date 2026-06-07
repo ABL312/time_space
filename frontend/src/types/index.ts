@@ -8,6 +8,7 @@ export interface User {
   name: string
   avatar_url?: string
   interest_tags: string[]
+  token?: string
   created_at: string
 }
 

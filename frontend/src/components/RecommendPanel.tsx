@@ -35,45 +35,45 @@ export default function RecommendPanel() {
   return (
     <div
       ref={panelRef}
-      className={`absolute bottom-0 left-0 right-0 z-[1000] transition-all duration-400 ease-out ${
-        expanded ? 'max-h-[72vh]' : 'max-h-20'
+      className={`absolute bottom-4 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 sm:w-[32rem] z-[1000] transition-all duration-300 ease-out ${
+        expanded ? 'max-h-[72vh]' : 'max-h-[56px]'
       }`}
       role="region"
-      aria-label="Nearby capsules"
+      aria-label="附近来信"
     >
-      <div className="hud overflow-hidden">
+      <div className="bg-bg/95 border border-primary/20 shadow-lg rounded-lg overflow-hidden backdrop-blur-sm">
         {/* HEADER BAR */}
         <button
           onClick={() => setExpanded(!expanded)}
-          className="w-full px-4 py-3 flex items-center justify-between row-hover min-h-[44px]"
+          className="w-full px-4 py-3.5 flex items-center justify-between hover:bg-surface/30 transition-colors relative min-h-[44px] cursor-pointer"
           aria-expanded={expanded}
           aria-controls="recommend-panel-content"
         >
           {/* Drag handle */}
-          <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-surface-light" />
+          <div className="absolute top-1.5 left-1/2 -translate-x-1/2 w-8 h-1 bg-primary/20 rounded-full" />
 
           <div className="flex items-center gap-3">
             {/* Signal indicator */}
-            <div className="flex items-center gap-1.5">
-              <div className={`w-1.5 h-1.5 ${total > 0 ? 'bg-signal breathe' : 'bg-slate-600'}`} />
-              <span className="data">
-                <span className="data-value">{total}</span> CAPSULES
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${total > 0 ? 'bg-primary animate-pulse' : 'bg-text-muted'}`} />
+              <span className="text-sm font-serif font-bold text-text-primary">
+                附近有 <span className="text-primary">{total}</span> 封时空来信
               </span>
             </div>
             {recommended.length > 0 && (
-              <span className="data px-1.5 py-0.5 border border-signal/20 text-signal">
-                {recommended.length} MATCHED
+              <span className="text-xs font-serif px-2 py-0.5 border border-primary/20 bg-primary/5 text-primary rounded-full font-medium">
+                {recommended.length} 封心声契合
               </span>
             )}
           </div>
 
           <div className="flex items-center gap-2">
             {isLoadingNearby && (
-              <div className="w-3 h-3 border border-signal border-t-transparent animate-spin" />
+              <div className="w-3.5 h-3.5 border-2 border-primary border-t-transparent animate-spin rounded-full" />
             )}
             <svg
-              className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}
-              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}
+              className={`w-4 h-4 text-primary transition-transform duration-300 ${expanded ? 'rotate-180' : ''}`}
+              fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" />
             </svg>
@@ -82,70 +82,71 @@ export default function RecommendPanel() {
 
         {/* EXPANDED CONTENT */}
         {expanded && (
-          <div id="recommend-panel-content" className="px-4 pb-6 overflow-y-auto max-h-[60vh] stagger" role="list">
+          <div id="recommend-panel-content" className="px-4 pb-6 overflow-y-auto max-h-[55vh] border-t border-primary/10">
             {/* Location context */}
             {nearby?.location_context && (
-              <div className="mb-3 p-2.5 border border-border bg-surface/50">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="label">SECTOR</span>
+              <div className="my-4 p-3 border border-dashed border-primary/20 bg-surface/40 rounded-md">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[10px] uppercase tracking-wider text-primary font-bold font-serif">当前区域</span>
                   {(nearby.location_context as Record<string, string | undefined>).scene_type && (
-                    <span className="data text-signal">
-                      {(nearby.location_context as Record<string, string | undefined>).scene_type}
+                    <span className="text-xs font-serif font-bold text-primary">
+                      📬 {(nearby.location_context as Record<string, string | undefined>).scene_type}
                     </span>
                   )}
                 </div>
-                <p className="text-xs text-slate-300">{nearby.location_context.name}</p>
+                <p className="text-sm font-serif font-bold text-text-primary mb-1">{nearby.location_context.name}</p>
                 {nearby.location_context.description && (
-                  <p className="data mt-1 line-clamp-2">{nearby.location_context.description}</p>
+                  <p className="text-xs text-text-secondary leading-relaxed font-serif">{nearby.location_context.description}</p>
                 )}
               </div>
             )}
 
             {/* Top recommended */}
             {top3.length > 0 ? (
-              <>
-                <div className="label mb-2 flex items-center gap-2">
-                  <span className="inline-block w-2 h-px bg-signal" />
-                  TOP MATCHES
+              <div className="mt-4">
+                <div className="text-xs uppercase tracking-wider text-primary font-serif font-bold mb-3 flex items-center gap-2">
+                  <span className="inline-block w-2 h-px bg-primary" />
+                  最契合的来信
                 </div>
-                <div className="space-y-1.5 mb-4">
+                <div className="space-y-3 mb-4">
                   {top3.map((c, i) => (
                     <CapsuleRow key={c.id} capsule={c} rank={i + 1} thumb={getThumb(c)} onClick={() => go(c)} />
                   ))}
                 </div>
-              </>
+              </div>
             ) : (
               !isLoadingNearby && <EmptyPanel hasLoc={!!nearby?.location_context} />
             )}
 
             {/* Others */}
             {others.length > 0 && (
-              <>
-                <div className="divider my-3" />
-                <div className="label mb-2 flex items-center justify-between">
+              <div className="mt-4 border-t border-primary/10 pt-4">
+                <div className="text-xs uppercase tracking-wider text-text-secondary font-serif font-bold mb-3 flex items-center justify-between">
                   <span className="flex items-center gap-2">
-                    <span className="inline-block w-2 h-px bg-slate-600" />
-                    NEARBY
+                    <span className="inline-block w-2 h-px bg-text-muted" />
+                    附近的其他来信
                   </span>
-                  <span className="data">{others.length}</span>
+                  <span className="text-text-muted font-normal">{others.length} 封</span>
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-2">
                   {others.slice(0, 5).map((c) => (
                     <button
                       key={c.id}
                       onClick={() => go(c)}
-                      className="w-full text-left p-2 border border-transparent hover:border-border row-hover transition-all"
+                      className="w-full text-left p-3 border border-border/40 hover:border-primary/30 rounded-md hover:bg-surface/20 transition-all cursor-pointer"
                     >
-                      <div className="flex items-center gap-2.5">
-                        <span className="w-1.5 h-1.5 bg-capsule-dim flex-shrink-0" />
+                      <div className="flex items-start gap-2.5">
+                        <span className="text-sm mt-0.5">✉️</span>
                         <div className="flex-1 min-w-0">
-                          <p className="text-xs text-slate-300 truncate">{c.message?.slice(0, 40)}</p>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            {c.emotion_tags?.slice(0, 2).map((t) => (
-                              <span key={t} className="data text-[9px] text-primary-light">{t}</span>
-                            ))}
+                          <p className="text-xs text-text-secondary font-serif line-clamp-2 leading-relaxed">{c.message}</p>
+                          <div className="flex items-center justify-between mt-2">
+                            <div className="flex items-center gap-1.5">
+                              {c.emotion_tags?.slice(0, 2).map((t) => (
+                                <span key={t} className="text-[10px] font-serif text-primary border border-primary/10 bg-primary/5 px-1.5 py-0.5 rounded">{t}</span>
+                              ))}
+                            </div>
                             {c.distance_m != null && (
-                              <span className="data text-[9px]">{fmtDist(c.distance_m)}</span>
+                              <span className="text-[10px] text-text-muted font-serif">{fmtDist(c.distance_m)}</span>
                             )}
                           </div>
                         </div>
@@ -153,7 +154,7 @@ export default function RecommendPanel() {
                     </button>
                   ))}
                 </div>
-              </>
+              </div>
             )}
           </div>
         )}
@@ -172,17 +173,17 @@ function CapsuleRow({ capsule, rank, thumb, onClick }: {
   const score = capsule.match_score != null ? Math.round(capsule.match_score) : null
 
   return (
-    <button onClick={onClick} className="w-full text-left row-hover flex overflow-hidden rounded-[var(--radius-md)] border border-border bg-surface hover:border-border-active transition-colors">
+    <button onClick={onClick} className="w-full text-left flex overflow-hidden rounded-md border border-primary/15 bg-surface/30 hover:border-primary/30 hover:bg-surface/50 transition-colors cursor-pointer">
       {/* Thumbnail / Rank */}
-      <div className="relative w-16 h-16 flex-shrink-0 bg-surface-light/30 flex items-center justify-center border-r border-border">
+      <div className="relative w-16 h-16 flex-shrink-0 bg-primary/5 flex items-center justify-center border-r border-primary/10">
         {thumb ? (
           <img src={thumb} alt="" className="w-full h-full object-cover" loading="lazy" />
         ) : (
-          <span className="data text-lg text-slate-600 font-mono">{String(rank).padStart(2, '0')}</span>
+          <span className="text-xl font-serif text-primary font-bold">📬</span>
         )}
         {/* Rank overlay */}
-        <div className="absolute top-0 left-0 bg-capsule/90 px-1">
-          <span className="text-[9px] font-mono font-bold text-void">#{rank}</span>
+        <div className="absolute top-0 left-0 bg-primary px-1.5 py-0.5 rounded-br-md">
+          <span className="text-[9px] font-serif font-bold text-white">#{rank}</span>
         </div>
       </div>
 
@@ -191,29 +192,28 @@ function CapsuleRow({ capsule, rank, thumb, onClick }: {
         {/* Score bar */}
         {score != null && (
           <div className="flex items-center gap-2 mb-1.5">
-            <div className="flex-1 flex gap-px">
+            <div className="flex-1 flex gap-0.5">
               {Array.from({ length: 10 }).map((_, i) => (
                 <div
                   key={i}
-                  className={`h-1 flex-1 ${i < Math.round(score / 10) ? 'bg-signal' : 'bg-surface-light'}`}
+                  className={`h-1 flex-1 rounded-sm ${i < Math.round(score / 10) ? 'bg-primary' : 'bg-primary/10'}`}
                 />
               ))}
             </div>
-            <span className="data-value text-[10px] font-mono">{score}%</span>
+            <span className="text-[10px] font-serif font-bold text-primary">{score}% 契合度</span>
           </div>
         )}
 
-        <p className="text-xs text-slate-200 truncate mb-1">{capsule.message?.slice(0, 50)}</p>
+        <p className="text-xs text-text-primary font-serif truncate mb-1.5">{capsule.message}</p>
 
-        <div className="flex items-center gap-2">
-          {capsule.emotion_tags?.slice(0, 2).map((t) => (
-            <span key={t} className="data text-[9px] text-primary-light border border-primary/15 px-1">{t}</span>
-          ))}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            {capsule.emotion_tags?.slice(0, 2).map((t) => (
+              <span key={t} className="text-[10px] font-serif text-primary border border-primary/10 bg-primary/5 px-1.5 py-0.5 rounded">{t}</span>
+            ))}
+          </div>
           {capsule.distance_m != null && (
-            <span className="data text-[9px]">{fmtDist(capsule.distance_m)}</span>
-          )}
-          {capsule.match_reasons?.[0] && (
-            <span className="data text-[9px] text-signal/70 truncate flex-1">{capsule.match_reasons[0]}</span>
+            <span className="text-[10px] text-text-muted font-serif">{fmtDist(capsule.distance_m)}</span>
           )}
         </div>
       </div>
@@ -228,9 +228,9 @@ function CapsuleRow({ capsule, rank, thumb, onClick }: {
 function EmptyPanel({ hasLoc }: { hasLoc: boolean }) {
   return (
     <div className="py-8 text-center">
-      <div className="label mb-2 text-slate-600">NO SIGNAL</div>
-      <p className="data">
-        {hasLoc ? 'No matching capsules in range' : 'Acquiring position data...'}
+      <div className="text-sm font-serif font-bold text-text-secondary mb-2">📬 静待回音</div>
+      <p className="text-xs text-text-muted font-serif">
+        {hasLoc ? '此地空余清风，尚无与你心声契合的信件' : '正在探寻物理空间中的时空信件...'}
       </p>
     </div>
   )

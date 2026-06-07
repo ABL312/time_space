@@ -1,7 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 
 export type ButtonVariant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'capsule' | 'icon'
-export type ButtonSize = 'sm' | 'md' | 'lg' | 'icon-sm' | 'icon-md'
+export type ButtonSize = 'sm' | 'md' | 'lg' | 'icon-sm' | 'icon-md' | 'icon-lg'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant
@@ -33,6 +33,7 @@ const sizeClasses: Record<ButtonSize, string> = {
   lg: 'px-6 py-2.5 text-base',
   'icon-sm': 'w-7 h-7',
   'icon-md': 'w-9 h-9',
+  'icon-lg': 'w-12 h-12',
 }
 
 const Button = forwardRef<HTMLButtonElement, ButtonProps>(

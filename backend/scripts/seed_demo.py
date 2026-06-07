@@ -62,24 +62,24 @@ def create_demo_users(conn):
     # 用户 1: 毕业生小林
     user1_id = "demo_graduate_xiaolin"
     cursor.execute(
-        "INSERT OR IGNORE INTO users (id, name, interest_tags) VALUES (?, ?, ?)",
-        (user1_id, "毕业生小林", json.dumps(["校园回忆", "青春", "友情"], ensure_ascii=False))
+        "INSERT OR IGNORE INTO users (id, name, interest_tags, token) VALUES (?, ?, ?, ?)",
+        (user1_id, "毕业生小林", json.dumps(["校园回忆", "青春", "友情"], ensure_ascii=False), "token_xiaolin")
     )
     print("✅ 创建演示用户: 毕业生小林")
     
     # 用户 2: 情侣小李
     user2_id = "demo_couple_xiaoli"
     cursor.execute(
-        "INSERT OR IGNORE INTO users (id, name, interest_tags) VALUES (?, ?, ?)",
-        (user2_id, "情侣小李", json.dumps(["爱情", "浪漫", "思念"], ensure_ascii=False))
+        "INSERT OR IGNORE INTO users (id, name, interest_tags, token) VALUES (?, ?, ?, ?)",
+        (user2_id, "情侣小李", json.dumps(["爱情", "浪漫", "思念"], ensure_ascii=False), "token_xiaoli")
     )
     print("✅ 创建演示用户: 情侣小李")
     
     # 用户 3: 怀念者小王
     user3_id = "demo_memorial_xiaowang"
     cursor.execute(
-        "INSERT OR IGNORE INTO users (id, name, interest_tags) VALUES (?, ?, ?)",
-        (user3_id, "怀念者小王", json.dumps(["家庭传承", "亲情", "怀旧"], ensure_ascii=False))
+        "INSERT OR IGNORE INTO users (id, name, interest_tags, token) VALUES (?, ?, ?, ?)",
+        (user3_id, "怀念者小王", json.dumps(["家庭传承", "亲情", "怀旧"], ensure_ascii=False), "token_xiaowang")
     )
     print("✅ 创建演示用户: 怀念者小王")
     

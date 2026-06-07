@@ -31,6 +31,7 @@ class UserResponse(BaseModel):
     name: str
     avatar_url: Optional[str] = None
     interest_tags: list[str]
+    token: Optional[str] = None
     created_at: str
 
 

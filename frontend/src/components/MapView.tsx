@@ -4,6 +4,7 @@ import 'leaflet/dist/leaflet.css'
 import 'leaflet.heat'
 import type { Capsule } from '../types'
 import Button from './ui/Button'
+import { useTimeTheme } from '../hooks/useTimeTheme'
 
 // leaflet.heat augments L with heatLayer but ships no types
 declare module 'leaflet' {
@@ -13,8 +14,8 @@ declare module 'leaflet' {
   ): L.Layer
 }
 
-function createBaseTileLayer() {
-  return L.tileLayer('https://rt{s}.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=1&version=297', {
+function createBaseTileLayer(styleId: string = '1') {
+  return L.tileLayer(`https://rt{s}.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=${styleId}&version=297`, {
     attribution: '&copy; 腾讯地图',
     subdomains: '0123',
     maxZoom: 18,
@@ -39,6 +40,9 @@ export default function MapView({
   capsules,
   onCapsuleClick,
 }: MapViewProps) {
+  const theme = useTimeTheme()
+  const styleId = (theme === 'evening' || theme === 'night') ? '4' : '1'
+
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map | null>(null)
   const markersRef = useRef<L.LayerGroup | null>(null)
@@ -80,8 +84,8 @@ export default function MapView({
       })
       console.log('[MapView] Map created:', !!map.current)
 
-      // 腾讯地图瓦片 — 高德 webrd 在当前环境返回空瓦片，腾讯源能稳定返回真实底图。
-      tileLayerRef.current = createBaseTileLayer().addTo(map.current)
+      // 腾讯地图瓦片
+      tileLayerRef.current = createBaseTileLayer(styleId).addTo(map.current)
       tileLayerRef.current.on('load', () => {
         setTilesLoaded(true)
         setTileError(false)
@@ -122,6 +126,12 @@ export default function MapView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Update map tile style when theme changes
+  useEffect(() => {
+    if (!map.current || !tileLayerRef.current) return
+    tileLayerRef.current.setUrl(`https://rt{s}.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=${styleId}&version=297`)
+  }, [styleId])
+
   // Keep map size in sync with layout changes.
   useEffect(() => {
     const invalidateMapSize = () => {
@@ -150,38 +160,49 @@ export default function MapView({
     if (!map.current || !markersRef.current) return
     markersRef.current.clearLayers()
 
-    // User position — cyan dot with glow
+    // User position — warm coral/terracotta dot
     const userIcon = L.divIcon({
       className: '',
       html: `<div style="
-        width: 12px; height: 12px;
-        background: #22d3ee;
-        box-shadow: 0 0 14px 4px rgba(34,211,238,0.5);
+        width: 14px; height: 14px;
+        background: var(--primary);
+        border: 2px solid #fff;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.25);
         border-radius: 50%;
       "></div>`,
-      iconSize: [12, 12],
-      iconAnchor: [6, 6],
+      iconSize: [14, 14],
+      iconAnchor: [7, 7],
     })
     L.marker([latitude, longitude], { icon: userIcon }).addTo(markersRef.current)
 
     // Capsule markers
     capsules.forEach((capsule) => {
       const isHot = (capsule.match_score ?? 0) > 50
-      const size = isHot ? 14 : 10
-      const color = isHot ? '#f5a623' : 'rgba(245,166,35,0.5)'
-      const glow = isHot ? 'box-shadow: 0 0 12px 3px rgba(245,166,35,0.5);' : ''
+      const markerChar = isHot ? '💌' : '✉'
+      const borderStyle = isHot ? 'solid' : 'dashed'
+      const borderColor = isHot ? 'var(--primary)' : 'var(--capsule)'
 
       const capsuleIcon = L.divIcon({
-        className: '',
+        className: 'custom-capsule-marker',
         html: `<div style="
-          width: ${size}px; height: ${size}px;
-          background: ${color};
-          border-radius: 50%;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 26px;
+          height: 26px;
+          background: var(--bg);
+          border: 1.5px ${borderStyle} ${borderColor};
+          border-radius: 4px;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+          font-size: 15px;
           cursor: pointer;
-          ${glow}
-        "></div>`,
-        iconSize: [size, size],
-        iconAnchor: [size / 2, size / 2],
+          transform-origin: center;
+          transition: transform 0.2s;
+        " class="hover:scale-125 hover:rotate-6">
+          ${markerChar}
+        </div>`,
+        iconSize: [26, 26],
+        iconAnchor: [13, 13],
       })
 
       const marker = L.marker([capsule.latitude, capsule.longitude], { icon: capsuleIcon })
@@ -191,43 +212,39 @@ export default function MapView({
 
     // Heatmap layer
     if (showHeatmap && map.current) {
-      // Remove existing heat layer if any
       if (heatLayerRef.current) {
         map.current.removeLayer(heatLayerRef.current)
       }
 
-      // Create heat data: [lat, lng, intensity]
       const heatData = capsules.map(c => [
         c.latitude, 
         c.longitude, 
-        Math.min((c.open_count || 0) / 100, 1) // Normalize to 0-1 range
+        Math.min((c.open_count || 0) / 100, 1)
       ])
 
-      // Create and add heat layer
       heatLayerRef.current = L.heatLayer(heatData as Array<[number, number, number]>, {
         radius: 25,
         blur: 15,
         maxZoom: 17,
-        gradient: {0.4: 'blue', 0.6: 'lime', 0.8: 'yellow', 1.0: 'red'}
+        gradient: {0.4: 'rgba(192, 92, 70, 0.3)', 0.7: 'rgba(217, 119, 6, 0.6)', 1.0: 'var(--primary)'}
       }).addTo(map.current)
     } else if (heatLayerRef.current && map.current) {
-      // Remove heat layer if it exists but shouldn't be shown
       map.current.removeLayer(heatLayerRef.current)
       heatLayerRef.current = null
     }
-  }, [capsules, latitude, longitude, onCapsuleClick, showHeatmap])
+  }, [capsules, latitude, longitude, onCapsuleClick, showHeatmap, styleId])
 
   return (
     <div className="absolute inset-0 w-full h-full bg-void">
       {!tilesLoaded && (
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(34,211,238,0.12),transparent_45%),linear-gradient(rgba(34,211,238,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(34,211,238,0.08)_1px,transparent_1px)] bg-[size:100%_100%,48px_48px,48px_48px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(192,92,70,0.12),transparent_45%),linear-gradient(rgba(192,92,70,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(192,92,70,0.06)_1px,transparent_1px)] bg-[size:100%_100%,48px_48px,48px_48px]" />
       )}
       <div ref={mapContainer} className="absolute inset-0 w-full h-full" role="application" aria-label="Interactive map" />
       {!tilesLoaded && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className="hud px-3 py-2 text-center">
-            <div className="data-value text-xs">MAP SIGNAL</div>
-            <div className="data mt-1">{tileError ? '瓦片加载失败，显示备用网格' : '正在加载地图瓦片...'}</div>
+          <div className="hud px-4 py-3 text-center rounded-lg border border-primary/20 bg-bg/95 shadow-md max-w-xs">
+            <div className="text-xs uppercase tracking-wider text-primary font-serif font-bold">时空信箱</div>
+            <div className="mt-2 text-xs text-text-secondary font-medium">{tileError ? '信箱底图加载失败，显示备用网格' : '正在唤醒时空信件底图...'}</div>
           </div>
         </div>
       )}
@@ -239,18 +256,18 @@ export default function MapView({
           onClick={() => setShowHeatmap(!showHeatmap)}
           className={`hud flex items-center gap-2 min-h-[44px] ${
             showHeatmap 
-              ? 'border-signal/30 bg-signal/5 text-signal' 
-              : 'border-border text-slate-400 hover:text-slate-200'
+              ? 'border-primary/40 bg-primary/10 text-primary' 
+              : 'border-border text-text-secondary hover:text-primary hover:bg-surface/50'
           }`}
-          title={showHeatmap ? "关闭热力图" : "开启热力图"}
+          title={showHeatmap ? "关闭热力分布" : "显示热力分布"}
           aria-label={showHeatmap ? "Disable heatmap" : "Enable heatmap"}
           aria-pressed={showHeatmap}
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
           </svg>
-          <span className="text-xs font-mono tracking-wider">
-            {showHeatmap ? 'HEAT ON' : 'HEAT OFF'}
+          <span className="text-xs font-serif font-semibold tracking-wider">
+            {showHeatmap ? '收起热力' : '信件热力'}
           </span>
         </Button>
       </div>
@@ -259,8 +276,8 @@ export default function MapView({
           variant="icon"
           size="icon-md"
           onClick={recenterToUser}
-          className="hud text-signal hover:text-white min-h-[44px]"
-          title="回到当前位置"
+          className="hud text-primary hover:bg-surface/50 border-border min-h-[44px]"
+          title="定位当前位置"
           aria-label="Recenter map to current location"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

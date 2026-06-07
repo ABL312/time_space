@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS users (
     name TEXT NOT NULL,
     avatar_url TEXT,
     interest_tags TEXT,  -- JSON array: ["校园回忆","家庭传承","人生感悟"]
+    token TEXT UNIQUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -117,7 +118,7 @@ CREATE TABLE IF NOT EXISTS collections (
 """
 
 
-async def get_db() -> aiosqlite.Connection:
+async def get_db_conn() -> aiosqlite.Connection:
     """Get a database connection. Creates DB file and tables if needed."""
     DB_DIR.mkdir(parents=True, exist_ok=True)
     db = await aiosqlite.connect(str(DB_PATH))
@@ -127,10 +128,27 @@ async def get_db() -> aiosqlite.Connection:
     return db
 
 
+async def get_db() -> aiosqlite.Connection:
+    """Get a database connection dependency for FastAPI. Automatically yields and closes."""
+    db = await get_db_conn()
+    try:
+        yield db
+    finally:
+        await db.close()
+
+
 async def init_db():
     """Initialize database schema (call on app startup)."""
     DB_DIR.mkdir(parents=True, exist_ok=True)
     async with aiosqlite.connect(str(DB_PATH)) as db:
         await db.executescript(SCHEMA_SQL)
+        # Migration: Add token column if it doesn't exist
+        try:
+            await db.execute("ALTER TABLE users ADD COLUMN token TEXT UNIQUE")
+            await db.commit()
+            print("🚀 Migrated database: added token column to users table")
+        except Exception:
+            # Column already exists, ignore
+            pass
         await db.commit()
     print(f"✅ Database initialized at {DB_PATH}")

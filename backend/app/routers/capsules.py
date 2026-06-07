@@ -2,20 +2,22 @@
 Capsule CRUD and nearby query routes.
 """
 import asyncio
+import aiosqlite
 import uuid
 import json
 import secrets
 import string
 from typing import Optional
 from datetime import datetime, timedelta
-from fastapi import APIRouter, HTTPException, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, UploadFile, File, Form, Depends
 
-from ..database import get_db
+from ..database import get_db, get_db_conn
 from ..models import CapsuleResponse, NearbyResponse
 from ..services.geohash_service import encode, find_nearby_capsules, haversine_distance, calculate_bounding_box
 from ..services.recommend_service import rank_capsules
 from ..services.storage_service import storage_service
 from ..services.emotion_service import emotion_service
+from ..auth import get_current_user, get_current_user_optional
 
 router = APIRouter(prefix="/api/capsules", tags=["capsules"])
 
@@ -24,7 +26,7 @@ async def _analyze_and_update_emotion(capsule_id: str, message: str):
     """Background task: analyze emotion and update capsule in DB."""
     try:
         result = await emotion_service.analyze(message)
-        db = await get_db()
+        db = await get_db_conn()
         try:
             await db.execute(
                 """
@@ -84,18 +86,18 @@ async def create_capsule(
     mood_tag: Optional[str] = Form(None),
     visibility: str = Form("public"),
     target_user_id: Optional[str] = Form(None),
-    author_id: Optional[str] = Form(None),
     voice_clone_url: Optional[str] = Form(None),
     unlock_at: Optional[str] = Form(None),  # Time lock feature
     photos: list[UploadFile] = File(default=[]),
     voice: Optional[UploadFile] = File(None),
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db),
 ):
     """Create a new time capsule with optional photos and voice."""
     capsule_id = str(uuid.uuid4())
     geohash = encode(latitude, longitude)
     share_token = _generate_share_token()
-
-    db = await get_db()
+    author_id = current_user["id"]
     try:
         # Parse unlock_at if provided
         unlock_at_dt = None
@@ -177,21 +179,38 @@ async def create_capsule(
 
 
 @router.get("/mine")
-async def get_my_capsules(user_id: str):
+async def get_my_capsules(
+    user_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db)
+):
     """Get all capsules created by a specific user."""
-    db = await get_db()
+    is_self = current_user["id"] == user_id
     try:
-        cursor = await db.execute(
-            """
-            SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
-            FROM capsules c
-            LEFT JOIN users u ON c.author_id = u.id
-            WHERE c.author_id = ?
-            ORDER BY c.created_at DESC
-            LIMIT 50
-            """,
-            (user_id,),
-        )
+        if is_self:
+            cursor = await db.execute(
+                """
+                SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
+                FROM capsules c
+                LEFT JOIN users u ON c.author_id = u.id
+                WHERE c.author_id = ?
+                ORDER BY c.created_at DESC
+                LIMIT 50
+                """,
+                (user_id,),
+            )
+        else:
+            cursor = await db.execute(
+                """
+                SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
+                FROM capsules c
+                LEFT JOIN users u ON c.author_id = u.id
+                WHERE c.author_id = ? AND c.visibility = 'public'
+                ORDER BY c.created_at DESC
+                LIMIT 50
+                """,
+                (user_id,),
+            )
         rows = await cursor.fetchall()
 
         capsules = []
@@ -220,15 +239,25 @@ async def get_nearby(
     radius: int = 1200,
     user_id: Optional[str] = None,
     scene_mood_match: Optional[str] = None,
+    current_user: Optional[dict] = Depends(get_current_user_optional),
+    db: aiosqlite.Connection = Depends(get_db),
 ):
     """Get nearby capsules sorted by distance, with recommendations."""
-    db = await get_db()
     try:
         # Find nearby capsules (only unlocked or expired)
         current_time = datetime.utcnow().isoformat()
+        
+        # Privacy filter: show public capsules, or private/link_only ones if the user is author or target
+        if current_user:
+            additional_where = "AND (unlock_at IS NULL OR unlock_at <= ?) AND (visibility = 'public' OR author_id = ? OR target_user_id = ?)"
+            additional_params = (current_time, current_user["id"], current_user["id"])
+        else:
+            additional_where = "AND (unlock_at IS NULL OR unlock_at <= ?) AND visibility = 'public'"
+            additional_params = (current_time,)
+            
         capsules = await find_nearby_capsules(db, lat, lng, radius_m=radius, 
-                                            additional_where="AND (unlock_at IS NULL OR unlock_at <= ?)",
-                                            additional_params=(current_time,))
+                                            additional_where=additional_where,
+                                            additional_params=additional_params)
 
         # Get user interest tags for ranking
         user_interest_tags = []
@@ -310,9 +339,10 @@ async def search_capsules(
     lng: Optional[float] = None,
     radius: int = 5000,
     user_id: Optional[str] = None,
+    current_user: Optional[dict] = Depends(get_current_user_optional),
+    db: aiosqlite.Connection = Depends(get_db),
 ):
     """Search capsules by content, tags, and location."""
-    db = await get_db()
     try:
         # Build query dynamically based on provided parameters
         base_query = """
@@ -345,6 +375,13 @@ async def search_capsules(
             base_query += " AND c.latitude BETWEEN ? AND ? AND c.longitude BETWEEN ? AND ?"
             params.extend([min_lat, max_lat, min_lng, max_lng])
         
+        # Privacy filter: show public capsules, or private/link_only ones if the user is author or target
+        if current_user:
+            base_query += " AND (c.visibility = 'public' OR c.author_id = ? OR c.target_user_id = ?)"
+            params.extend([current_user["id"], current_user["id"]])
+        else:
+            base_query += " AND c.visibility = 'public'"
+            
         # Only show unlocked capsules
         current_time = datetime.utcnow().isoformat()
         base_query += " AND (c.unlock_at IS NULL OR c.unlock_at <= ?)"
@@ -427,9 +464,12 @@ async def search_capsules(
 
 
 @router.get("/shared/{share_token}")
-async def get_capsule_by_share_token(share_token: str):
+async def get_capsule_by_share_token(
+    share_token: str,
+    current_user: Optional[dict] = Depends(get_current_user_optional),
+    db: aiosqlite.Connection = Depends(get_db)
+):
     """Get capsule detail by share token. Auto-increments open_count."""
-    db = await get_db()
     try:
         cursor = await db.execute(
             """
@@ -445,6 +485,12 @@ async def get_capsule_by_share_token(share_token: str):
             raise HTTPException(status_code=404, detail="Capsule not found")
 
         capsule = _parse_capsule_row(dict(row))
+        
+        # Visibility check: if private, only allow author or target user
+        visibility = capsule.get("visibility", "public")
+        if visibility == "private":
+            if not current_user or (current_user["id"] != capsule["author_id"] and current_user["id"] != capsule.get("target_user_id")):
+                raise HTTPException(status_code=403, detail="This is a private capsule and cannot be shared publicly")
         
         # Check if capsule is time-locked
         unlock_at = capsule.get("unlock_at")
@@ -493,12 +539,10 @@ async def get_capsule_by_share_token(share_token: str):
 
 
 @router.get("/daily-recommend")
-async def get_daily_recommend():
+async def get_daily_recommend(db: aiosqlite.Connection = Depends(get_db)):
     """Get today's recommended capsule based on date seed."""
     from datetime import date
     import random
-    
-    db = await get_db()
     try:
         # Get today's date as seed
         today = date.today()
@@ -583,9 +627,12 @@ async def get_daily_recommend():
         await db.close()
 
 @router.get("/{capsule_id}")
-async def get_capsule(capsule_id: str):
+async def get_capsule(
+    capsule_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db)
+):
     """Get capsule detail by ID. Auto-increments open_count."""
-    db = await get_db()
     try:
         cursor = await db.execute(
             """
@@ -601,6 +648,15 @@ async def get_capsule(capsule_id: str):
             raise HTTPException(status_code=404, detail="Capsule not found")
 
         capsule = _parse_capsule_row(dict(row))
+        
+        # Visibility controls
+        visibility = capsule.get("visibility", "public")
+        if visibility == "private":
+            if current_user["id"] != capsule["author_id"] and current_user["id"] != capsule.get("target_user_id"):
+                raise HTTPException(status_code=403, detail="This is a private capsule")
+        elif visibility == "link_only":
+            if current_user["id"] != capsule["author_id"] and current_user["id"] != capsule.get("target_user_id"):
+                raise HTTPException(status_code=403, detail="This capsule is link-only and must be accessed via shared link")
         
         # Check if capsule is time-locked
         unlock_at = capsule.get("unlock_at")
@@ -652,11 +708,12 @@ async def get_capsule(capsule_id: str):
 async def reply_to_capsule(
     capsule_id: str,
     message: str = Form(..., min_length=10, max_length=500),
-    author_id: Optional[str] = Form(None),
     photos: list[UploadFile] = File(default=[]),
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db)
 ):
     """Create a reply capsule at the same location."""
-    db = await get_db()
+    author_id = current_user["id"]
     try:
         # Get original capsule location
         cursor = await db.execute(
@@ -737,17 +794,23 @@ async def reply_to_capsule(
 
 
 @router.post("/{capsule_id}/regenerate-share")
-async def regenerate_share_token(capsule_id: str):
+async def regenerate_share_token(
+    capsule_id: str,
+    current_user: dict = Depends(get_current_user),
+    db: aiosqlite.Connection = Depends(get_db)
+):
     """Regenerate share token for a capsule."""
-    db = await get_db()
     try:
-        # Check if capsule exists
+        # Check if capsule exists and user is author
         cursor = await db.execute(
-            "SELECT id FROM capsules WHERE id = ?", (capsule_id,)
+            "SELECT author_id FROM capsules WHERE id = ?", (capsule_id,)
         )
         row = await cursor.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Capsule not found")
+            
+        if row[0] != current_user["id"]:
+            raise HTTPException(status_code=403, detail="Only the author can regenerate the share token")
 
         # Generate new share token
         new_share_token = _generate_share_token()
