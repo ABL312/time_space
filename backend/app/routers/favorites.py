@@ -82,6 +82,7 @@ async def remove_favorite(
     return {"message": "Capsule removed from favorites"}
 
 @router.get("", response_model=List[CapsuleResponse], summary="Get user's favorite capsules")
+@router.get("/", response_model=List[CapsuleResponse], summary="Get user's favorite capsules")
 async def get_favorites(
     current_user: dict = Depends(get_current_user),
     db: aiosqlite.Connection = Depends(get_db)
@@ -94,9 +95,11 @@ async def get_favorites(
         SELECT c.id, c.author_id, c.latitude, c.longitude, c.geohash, 
                c.location_name, c.message, c.voice_url, c.voice_clone_url,
                c.emotion_tags, c.sentiment, c.emotion_intensity, c.emotion_summary,
-               c.mood_tag, c.visibility, c.open_count, c.created_at
+               c.mood_tag, c.visibility, c.open_count, c.created_at,
+               u.name as author_name, u.avatar_url as author_avatar
         FROM capsules c
         INNER JOIN favorites f ON c.id = f.capsule_id
+        LEFT JOIN users u ON c.author_id = u.id
         WHERE f.user_id = ?
         ORDER BY f.created_at DESC
         """,
@@ -106,10 +109,17 @@ async def get_favorites(
             # Parse JSON fields
             import json
             emotion_tags = json.loads(row[9]) if row[9] else None
+            author_dict = None
+            if row[17]:
+                author_dict = {
+                    "name": row[17],
+                    "avatar": row[18]
+                }
             
             capsules.append(CapsuleResponse(
                 id=row[0],
                 author_id=row[1],
+                author=author_dict,
                 latitude=row[2],
                 longitude=row[3],
                 geohash=row[4],

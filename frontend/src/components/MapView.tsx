@@ -1,25 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import 'leaflet.heat'
 import type { Capsule } from '../types'
 import Button from './ui/Button'
 import { useTimeTheme } from '../hooks/useTimeTheme'
 
-// leaflet.heat augments L with heatLayer but ships no types
-declare module 'leaflet' {
-  function heatLayer(
-    latlngs: Array<[number, number, number]>,
-    options?: Record<string, unknown>
-  ): L.Layer
-}
+function createBaseTileLayer(_styleId: string = '1') {
+  const url = 'https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}'
 
-function createBaseTileLayer(styleId: string = '1') {
-  return L.tileLayer(`https://rt{s}.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=${styleId}&version=297`, {
-    attribution: '&copy; 腾讯地图',
-    subdomains: '0123',
+  return L.tileLayer(url, {
+    attribution: '&copy; 高德地图',
+    subdomains: '1234',
     maxZoom: 18,
-    tms: true,
     keepBuffer: 4,
     updateWhenIdle: true,
     updateWhenZooming: false,
@@ -46,9 +38,7 @@ export default function MapView({
   const mapContainer = useRef<HTMLDivElement>(null)
   const map = useRef<L.Map | null>(null)
   const markersRef = useRef<L.LayerGroup | null>(null)
-  const heatLayerRef = useRef<L.Layer | null>(null)
   const tileLayerRef = useRef<L.TileLayer | null>(null)
-  const [showHeatmap, setShowHeatmap] = useState(false)
   const [tilesLoaded, setTilesLoaded] = useState(false)
   const [tileError, setTileError] = useState(false)
 
@@ -95,8 +85,7 @@ export default function MapView({
       })
       console.log('[MapView] Tile layer added')
 
-      // Zoom control top-right
-      L.control.zoom({ position: 'topright' }).addTo(map.current)
+      // Zoom control removed (requested by user)
 
       // Layer group for markers
       markersRef.current = L.layerGroup().addTo(map.current)
@@ -128,8 +117,8 @@ export default function MapView({
 
   // Update map tile style when theme changes
   useEffect(() => {
-    if (!map.current || !tileLayerRef.current) return
-    tileLayerRef.current.setUrl(`https://rt{s}.map.gtimg.com/tile?z={z}&x={x}&y={y}&styleid=${styleId}&version=297`)
+    // Theme switching is handled via CSS filters on the map container container,
+    // so no need to reload tiles from the network.
   }, [styleId])
 
   // Keep map size in sync with layout changes.
@@ -209,37 +198,14 @@ export default function MapView({
       marker.on('click', () => onCapsuleClick?.(capsule))
       marker.addTo(markersRef.current!)
     })
-
-    // Heatmap layer
-    if (showHeatmap && map.current) {
-      if (heatLayerRef.current) {
-        map.current.removeLayer(heatLayerRef.current)
-      }
-
-      const heatData = capsules.map(c => [
-        c.latitude, 
-        c.longitude, 
-        Math.min((c.open_count || 0) / 100, 1)
-      ])
-
-      heatLayerRef.current = L.heatLayer(heatData as Array<[number, number, number]>, {
-        radius: 25,
-        blur: 15,
-        maxZoom: 17,
-        gradient: {0.4: 'rgba(192, 92, 70, 0.3)', 0.7: 'rgba(217, 119, 6, 0.6)', 1.0: 'var(--primary)'}
-      }).addTo(map.current)
-    } else if (heatLayerRef.current && map.current) {
-      map.current.removeLayer(heatLayerRef.current)
-      heatLayerRef.current = null
-    }
-  }, [capsules, latitude, longitude, onCapsuleClick, showHeatmap, styleId])
+  }, [capsules, latitude, longitude, onCapsuleClick, styleId])
 
   return (
     <div className="absolute inset-0 w-full h-full bg-void">
       {!tilesLoaded && (
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(192,92,70,0.12),transparent_45%),linear-gradient(rgba(192,92,70,0.06)_1px,transparent_1px),linear-gradient(90deg,rgba(192,92,70,0.06)_1px,transparent_1px)] bg-[size:100%_100%,48px_48px,48px_48px]" />
       )}
-      <div ref={mapContainer} className="absolute inset-0 w-full h-full" role="application" aria-label="Interactive map" />
+      <div ref={mapContainer} className={`absolute inset-0 w-full h-full ${styleId === '4' ? 'map-tiles-dark' : ''}`} role="application" aria-label="Interactive map" />
       {!tilesLoaded && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="hud px-4 py-3 text-center rounded-lg border border-primary/20 bg-bg/95 shadow-md max-w-xs">
@@ -248,30 +214,8 @@ export default function MapView({
           </div>
         </div>
       )}
-      {/* Heatmap Toggle Button */}
-      <div className="absolute top-20 right-3 z-[1000]">
-        <Button
-          variant="icon"
-          size="icon-md"
-          onClick={() => setShowHeatmap(!showHeatmap)}
-          className={`hud flex items-center gap-2 min-h-[44px] ${
-            showHeatmap 
-              ? 'border-primary/40 bg-primary/10 text-primary' 
-              : 'border-border text-text-secondary hover:text-primary hover:bg-surface/50'
-          }`}
-          title={showHeatmap ? "关闭热力分布" : "显示热力分布"}
-          aria-label={showHeatmap ? "Disable heatmap" : "Enable heatmap"}
-          aria-pressed={showHeatmap}
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-          </svg>
-          <span className="text-xs font-serif font-semibold tracking-wider">
-            {showHeatmap ? '收起热力' : '信件热力'}
-          </span>
-        </Button>
-      </div>
-      <div className="absolute top-32 right-3 z-[1000]">
+      {/* Recenter Button */}
+      <div className="absolute top-[96px] right-3 z-[1000]">
         <Button
           variant="icon"
           size="icon-md"

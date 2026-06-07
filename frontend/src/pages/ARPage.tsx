@@ -29,6 +29,7 @@ export default function ARPage() {
   const { isOnline } = useOnline()
   const [cameraReady, setCameraReady] = useState(false)
   const [cameraError, setCameraError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
   const cameraStreamRef = useRef<MediaStream | null>(null)
   const [smartLayout, setSmartLayout] = useState<ARSceneLayout | null>(null)
   const [smartAnchor, setSmartAnchor] = useState<SmartARAnchor | null>(null)
@@ -72,7 +73,7 @@ export default function ARPage() {
       stream?.getTracks().forEach((t) => t.stop())
       if (cameraStreamRef.current === stream) cameraStreamRef.current = null
     }
-  }, [cap.hasCamera, cap.isReady])
+  }, [cap.hasCamera, cap.isReady, retryCount])
 
   useEffect(() => {
     fetchNearby({ lat: arAnchor.lat, lng: arAnchor.lng, radius: 500 })
@@ -382,12 +383,23 @@ export default function ARPage() {
             <span className="text-4xl block mb-3">📸</span>
             <h3 className="text-lg font-bold text-text-primary mb-2">相机无法使用</h3>
             <p className="text-xs text-text-secondary leading-relaxed mb-1">{cameraError}</p>
-            <p className="text-xs text-text-muted mb-6">正在为你切换至列表寻信模式</p>
-            <div className="flex gap-3 justify-center">
-              <button onClick={() => navigate('/')} className="px-4 py-2 border border-primary/20 text-primary text-xs font-bold rounded-md hover:bg-surface cursor-pointer">返回地图</button>
-              {capsules.length > 0 && (
-                <button onClick={() => navigate(`/capsule/${capsules[0].id}`)} className="px-4 py-2 bg-primary text-white text-xs font-bold rounded-md hover:bg-primary-dark shadow-sm cursor-pointer">浏览来信</button>
-              )}
+            <p className="text-xs text-text-muted mb-6">您可以在此重试授权相机权限，或切换至列表寻信模式</p>
+            <div className="flex flex-col gap-2.5 justify-center">
+              <button 
+                onClick={() => {
+                  setCameraError(null)
+                  setRetryCount(prev => prev + 1)
+                }} 
+                className="w-full px-4 py-2.5 bg-primary text-white text-xs font-bold rounded-md hover:bg-primary-dark shadow-sm cursor-pointer font-bold font-serif"
+              >
+                🔄 重试相机授权
+              </button>
+              <div className="flex gap-2 w-full">
+                <button onClick={() => navigate('/')} className="flex-1 px-4 py-2 border border-primary/20 text-primary text-xs font-bold rounded-md hover:bg-surface cursor-pointer font-serif">返回地图</button>
+                {capsules.length > 0 && (
+                  <button onClick={() => navigate(`/capsule/${capsules[0].id}`)} className="flex-1 px-4 py-2 bg-surface border border-primary/15 text-text-primary text-xs font-bold rounded-md hover:bg-surface-light cursor-pointer font-serif">浏览来信</button>
+                )}
+              </div>
             </div>
           </div>
         </div>

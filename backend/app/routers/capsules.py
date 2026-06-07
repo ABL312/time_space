@@ -367,8 +367,9 @@ async def search_capsules(
             for t in tags:
                 params.append(f"%{t}%")
         
-        # Location-based filtering
-        if lat is not None and lng is not None:
+        # Location-based filtering: only restrict by bounding box if this is a pure location search (no text or tag)
+        is_text_search = bool(q or tag)
+        if lat is not None and lng is not None and not is_text_search:
             # Calculate bounding box for initial filtering
             min_lat, max_lat, min_lng, max_lng = calculate_bounding_box(lat, lng, radius)
             
@@ -397,15 +398,15 @@ async def search_capsules(
         for row in rows:
             capsule = _parse_capsule_row(dict(row))
             
-            # Precise distance filtering for location-based searches
+            # Precise distance calculation for location-based searches
             if lat is not None and lng is not None:
                 from ..services.geohash_service import haversine_distance
                 capsule_lat = capsule["latitude"]
                 capsule_lng = capsule["longitude"]
                 distance = haversine_distance(lat, lng, capsule_lat, capsule_lng)
                 
-                # Skip capsules outside the radius
-                if distance > radius:
+                # Skip capsules outside the radius ONLY IF this is a pure location search
+                if not is_text_search and distance > radius:
                     continue
                 
                 capsule["distance_m"] = distance
@@ -534,6 +535,46 @@ async def get_capsule_by_share_token(
         await db.commit()
 
         return capsule
+    finally:
+        await db.close()
+
+
+@router.get("/recent", response_model=list[CapsuleResponse])
+async def get_recent_capsules(
+    limit: int = 20,
+    db: aiosqlite.Connection = Depends(get_db)
+):
+    """Get recent public capsules for danmaku display."""
+    try:
+        cursor = await db.execute(
+            """
+            SELECT c.*, u.name as author_name, u.avatar_url as author_avatar
+            FROM capsules c
+            LEFT JOIN users u ON c.author_id = u.id
+            WHERE c.visibility = 'public'
+            AND (c.unlock_at IS NULL OR c.unlock_at <= ?)
+            ORDER BY c.created_at DESC
+            LIMIT ?
+            """,
+            (datetime.utcnow().isoformat(), limit),
+        )
+        rows = await cursor.fetchall()
+
+        capsules = []
+        for row in rows:
+            capsule = _parse_capsule_row(dict(row))
+
+            # Fetch media for each capsule
+            media_cursor = await db.execute(
+                "SELECT * FROM media WHERE capsule_id = ? ORDER BY sort_order",
+                (capsule["id"],),
+            )
+            media_rows = await media_cursor.fetchall()
+            capsule["media"] = [dict(m) for m in media_rows]
+
+            capsules.append(capsule)
+
+        return capsules
     finally:
         await db.close()
 

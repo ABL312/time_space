@@ -141,6 +141,7 @@ export interface VoiceCloneResult {
   voice_id: string
   audio_url: string
   duration_seconds: number
+  message?: string
 }
 
 /** Response to a capsule */

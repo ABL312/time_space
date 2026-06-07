@@ -1,8 +1,6 @@
-import { useEffect, useRef, useState } from 'react'
+import { useMemo } from 'react'
 import type { Capsule } from '../types'
 import { haversineDistance, calculateBearing } from '../hooks/useGeolocation'
-
-type THREE = typeof import('three')
 
 interface ARSceneProps {
   userLat: number
@@ -13,6 +11,17 @@ interface ARSceneProps {
   onCapsuleClick: (id: string) => void
 }
 
+/** Screen-space position derived from GPS bearing + device orientation */
+interface EnvelopePosition {
+  id: string
+  capsule: Capsule
+  distance: number
+  left: number   // 0-100%
+  top: number    // 0-100%
+  scale: number  // 0.1-1
+  opacity: number
+}
+
 export default function ARScene({
   userLat,
   userLng,
@@ -21,272 +30,197 @@ export default function ARScene({
   capsules,
   onCapsuleClick,
 }: ARSceneProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const THREERef = useRef<THREE | null>(null)
-  // Use `unknown` for Three.js instance refs to avoid top-level type dependency
-  const sceneRef = useRef<unknown>(null)
-  const rendererRef = useRef<unknown>(null)
-  const cameraRef = useRef<unknown>(null)
-  const capsuleMeshesRef = useRef<Map<string, unknown>>(new Map())
-  const animFrameRef = useRef<number>(0)
-  const [threeReady, setThreeReady] = useState(false)
-  // Keep latest callback in a ref to avoid re-creating the raycasting effect
-  const onCapsuleClickRef = useRef(onCapsuleClick)
-  useEffect(() => {
-    onCapsuleClickRef.current = onCapsuleClick
-  }, [onCapsuleClick])
+  const envelopes = useMemo<EnvelopePosition[]>(() => {
+    return capsules
+      .map((capsule) => {
+        const distance = haversineDistance(
+          userLat, userLng,
+          capsule.latitude, capsule.longitude
+        )
+        if (distance > 500) return null
 
-  // Lazy-load Three.js
-  useEffect(() => {
-    let disposed = false
-    import('three').then((mod) => {
-      if (disposed) return
-      THREERef.current = mod as unknown as THREE
-      setThreeReady(true)
-    })
-    return () => { disposed = true }
-  }, [])
+        const bearing = calculateBearing(
+          userLat, userLng,
+          capsule.latitude, capsule.longitude
+        )
 
-  // Initialize Three.js scene
-  useEffect(() => {
-    const container = containerRef.current
-    const THREE = THREERef.current
-    if (!container || !THREE) return
+        const heading = deviceAlpha ?? 0
+        let angleDiff = heading - bearing
+        if (angleDiff > 180) angleDiff -= 360
+        if (angleDiff < -180) angleDiff += 360
 
-    // Scene
-    const scene = new THREE.Scene()
-    sceneRef.current = scene
+        const inView = deviceAlpha == null || Math.abs(angleDiff) <= 60
+        if (!inView) return null
 
-    // Camera (matches device FOV)
-    const camera = new THREE.PerspectiveCamera(
-      70,
-      window.innerWidth / window.innerHeight,
-      0.1,
-      1000
-    )
-    cameraRef.current = camera
+        // Map horizontal angle (-60..+60) → screen X (10%..90%)
+        const left = 50 + (angleDiff / 60) * 40
 
-    // Renderer (transparent background)
-    const renderer = new THREE.WebGLRenderer({
-      alpha: true,
-      antialias: true,
-    })
-    renderer.setSize(window.innerWidth, window.innerHeight)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    rendererRef.current = renderer
-    container.appendChild(renderer.domElement)
+        // Pitch offset: tilt up/down → vertical shift
+        const pitchOffset = deviceBeta == null
+          ? 0
+          : Math.max(-1, Math.min(1, (deviceBeta - 60) / 35))
+        const top = 45 + pitchOffset * 15
 
-    // Lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6)
-    scene.add(ambientLight)
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8)
-    directionalLight.position.set(5, 10, 5)
-    scene.add(directionalLight)
+        const scale = Math.max(0.15, 1 - distance / 500)
+        const opacity = Math.max(0.2, 1 - Math.abs(angleDiff) / 90)
 
-    // Point light for glow effect
-    const pointLight = new THREE.PointLight(0xf59e0b, 1, 10)
-    pointLight.position.set(0, 2, -3)
-    scene.add(pointLight)
-
-    // Handle resize
-    const handleResize = () => {
-      camera.aspect = window.innerWidth / window.innerHeight
-      camera.updateProjectionMatrix()
-      renderer.setSize(window.innerWidth, window.innerHeight)
-    }
-    window.addEventListener('resize', handleResize)
-
-    return () => {
-      window.removeEventListener('resize', handleResize)
-      cancelAnimationFrame(animFrameRef.current)
-      renderer.dispose()
-      if (container && renderer.domElement) {
-        container.removeChild(renderer.domElement)
-      }
-    }
-  }, [threeReady])
-
-  // Update capsule positions based on GPS + orientation
-  useEffect(() => {
-    const THREE = THREERef.current
-    const scene = sceneRef.current as import('three').Scene | null
-    const camera = cameraRef.current as import('three').PerspectiveCamera | null
-    const renderer = rendererRef.current as import('three').WebGLRenderer | null
-    if (!scene || !camera || !renderer || !THREE) return
-
-    // Remove old meshes that are no longer in capsules list
-    const currentIds = new Set(capsules.map((c) => c.id))
-    capsuleMeshesRef.current.forEach((mesh, id) => {
-      if (!currentIds.has(id)) {
-        scene.remove(mesh as import('three').Object3D)
-        capsuleMeshesRef.current.delete(id)
-      }
-    })
-
-    // Add/update capsule meshes
-    capsules.forEach((capsule) => {
-      const distance = haversineDistance(userLat, userLng, capsule.latitude, capsule.longitude)
-      const bearing = calculateBearing(userLat, userLng, capsule.latitude, capsule.longitude)
-
-      // Only render capsules within 500m
-      if (distance > 500) return
-
-      let group = capsuleMeshesRef.current.get(capsule.id) as import('three').Group | undefined
-      if (!group) {
-        group = createCapsuleMesh(THREE, capsule)
-        scene.add(group)
-        capsuleMeshesRef.current.set(capsule.id, group)
-      }
-
-      // Position based on bearing relative to device heading
-      const heading = deviceAlpha ?? 0
-      let angleDiff = heading - bearing
-      if (angleDiff > 180) angleDiff -= 360
-      if (angleDiff < -180) angleDiff += 360
-
-      // Only show if within ±60° field of view. If the browser has not
-      // provided a compass heading yet, keep capsules visible so AR still has
-      // an obvious effect instead of rendering an empty camera view.
-      const visible = deviceAlpha == null || Math.abs(angleDiff) <= 60
-      group.visible = visible
-
-      if (visible) {
-        // Convert angle to screen-space position
-        const x = (angleDiff / 60) * 3 // spread across scene width
-        const pitchOffset = deviceBeta == null ? 0 : Math.max(-1.2, Math.min(1.2, (deviceBeta - 60) / 35))
-        const y = 0.5 - pitchOffset
-        const z = -Math.max(1, distance / 50) // further = more negative z
-
-        group.position.set(x, y, z)
-
-        // Scale based on distance
-        const scale = Math.max(0.1, 1 - distance / 500)
-        group.scale.setScalar(scale)
-      }
-    })
-
-    // Raycasting for click detection
-    const raycaster = new THREE.Raycaster()
-    const mouse = new THREE.Vector2()
-
-    const handleClick = (event: MouseEvent) => {
-      // Calculate mouse position in normalized device coordinates
-      const rect = renderer.domElement.getBoundingClientRect()
-      mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1
-      mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1
-
-      // Update the picking ray with the camera and mouse position
-      raycaster.setFromCamera(mouse, camera)
-
-      // Calculate objects intersecting the picking ray
-      const intersects = raycaster.intersectObjects(
-        Array.from(capsuleMeshesRef.current.values()).filter(
-          (m) => (m as import('three').Object3D).visible
-        ) as import('three').Object3D[],
-        true
-      )
-
-      if (intersects.length > 0) {
-        const clickedGroup = intersects[0].object.parent as import('three').Group
-        if (clickedGroup && clickedGroup.userData.capsuleId) {
-          onCapsuleClickRef.current(clickedGroup.userData.capsuleId)
-        }
-      }
-    }
-
-    // Animation loop
-    const animate = () => {
-      animFrameRef.current = requestAnimationFrame(animate)
-
-      // Float animation for all visible capsules
-      const time = Date.now() * 0.001
-      capsuleMeshesRef.current.forEach((group) => {
-        const g = group as import('three').Group
-        if (g.visible) {
-          g.position.y += Math.sin(time * 2 + g.position.x) * 0.001
-          g.rotation.y += 0.005
-        }
+        return { id: capsule.id, capsule, distance, left, top, scale, opacity }
       })
-
-      renderer.render(scene, camera)
-    }
-
-    // Attach event listener
-    renderer.domElement.addEventListener('click', handleClick)
-    animate()
-
-    return () => {
-      cancelAnimationFrame(animFrameRef.current)
-      // Clean up event listener
-      if (rendererRef.current) {
-        const r = rendererRef.current as import('three').WebGLRenderer
-        if (r.domElement) {
-          r.domElement.removeEventListener('click', handleClick)
-        }
-      }
-    }
-  }, [userLat, userLng, deviceAlpha, deviceBeta, capsules, threeReady])
+      .filter((e): e is EnvelopePosition => e !== null)
+  }, [userLat, userLng, deviceAlpha, deviceBeta, capsules])
 
   return (
-    <div
-      ref={containerRef}
-      className="absolute inset-0 z-10 pointer-events-auto"
-      style={{ mixBlendMode: 'screen' }}
-    />
+    <div className="absolute inset-0 z-10 pointer-events-none overflow-hidden">
+      {envelopes.map((env) => (
+        <CartoonEnvelope
+          key={env.id}
+          envelope={env}
+          onClick={() => onCapsuleClick(env.id)}
+        />
+      ))}
+    </div>
   )
 }
 
-/** Create a 3D envelope mesh group */
-function createCapsuleMesh(THREE: THREE, capsule: Capsule): import('three').Group {
-  const group = new THREE.Group()
+/* ── Cartoon Envelope Card ─────────────────────────────────────── */
 
-  // Envelope body
-  const envelopeGeometry = new THREE.BoxGeometry(0.6, 0.4, 0.05)
-  const envelopeMaterial = new THREE.MeshStandardMaterial({
-    color: 0xf59e0b,
-    emissive: 0xf59e0b,
-    emissiveIntensity: 0.3,
-    metalness: 0.3,
-    roughness: 0.7,
-  })
-  const envelope = new THREE.Mesh(envelopeGeometry, envelopeMaterial)
-  group.add(envelope)
+function CartoonEnvelope({
+  envelope: env,
+  onClick,
+}: {
+  envelope: EnvelopePosition
+  onClick: () => void
+}) {
+  const { capsule, distance, left, top, scale, opacity } = env
+  const animDelay = `${(parseFloat(capsule.id.slice(-4)) || 0) * 0.01}s`
+  const gradId = `envGrad-${capsule.id}`
 
-  // Envelope flap (triangle on top)
-  const flapGeometry = new THREE.ConeGeometry(0.3, 0.2, 4)
-  const flapMaterial = new THREE.MeshStandardMaterial({
-    color: 0xd97706,
-    emissive: 0xd97706,
-    emissiveIntensity: 0.2,
-    metalness: 0.3,
-    roughness: 0.7,
-  })
-  const flap = new THREE.Mesh(flapGeometry, flapMaterial)
-  flap.position.set(0, 0.25, 0)
-  flap.rotation.z = Math.PI
-  group.add(flap)
+  return (
+    <button
+      onClick={onClick}
+      className="
+        absolute pointer-events-auto
+        flex flex-col items-center
+        transition-[left,top,transform,opacity] duration-300 ease-out
+        cursor-pointer group
+      "
+      style={{
+        left: `${left}%`,
+        top: `${top}%`,
+        transform: `translate(-50%, -50%) scale(${scale})`,
+        opacity,
+        animationDelay: animDelay,
+      }}
+    >
+      {/* Float animation wrapper */}
+      <div
+        className="envelope-float flex flex-col items-center"
+        style={{ animationDelay: animDelay }}
+      >
+        {/* ── Cartoon envelope (SVG) ── */}
+        <div className="
+          relative
+          w-16 h-12
+          group-hover:scale-110 group-active:scale-95
+          transition-transform duration-200
+          drop-shadow-lg
+        ">
+          {/* Sparkle */}
+          <div className="
+            absolute -top-2 -right-2 z-10
+            text-xs leading-none
+            animate-bounce-in
+          " style={{ animationDelay: animDelay }}>
+            ✨
+          </div>
 
-  // Glow particles
-  const particlesGeometry = new THREE.BufferGeometry()
-  const particleCount = 30
-  const positions = new Float32Array(particleCount * 3)
-  for (let i = 0; i < particleCount * 3; i++) {
-    positions[i] = (Math.random() - 0.5) * 1.2
-  }
-  particlesGeometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+          <svg viewBox="0 0 64 48" className="w-full h-full overflow-visible">
+            {/* Shadow under envelope */}
+            <rect x="1" y="2" width="62" height="44" rx="6" fill="#d97706" opacity="0.25" />
 
-  const particlesMaterial = new THREE.PointsMaterial({
-    color: 0xfbbf24,
-    size: 0.03,
-    transparent: true,
-    opacity: 0.6,
-    blending: THREE.AdditiveBlending,
-  })
-  const particles = new THREE.Points(particlesGeometry, particlesMaterial)
-  group.add(particles)
+            {/* Envelope body */}
+            <rect x="0" y="0" width="62" height="43" rx="5"
+              fill={`url(#${gradId})`} stroke="#d97706" strokeWidth="1.8" />
 
-  // Store capsule ID for click detection
-  group.userData = { capsuleId: capsule.id }
+            {/* Fold lines (cross pattern) */}
+            <line x1="0" y1="21" x2="62" y2="21" stroke="#f59e0b" strokeWidth="0.8" opacity="0.5" strokeDasharray="2,2" />
+            <line x1="31" y1="0" x2="31" y2="21" stroke="#f59e0b" strokeWidth="0.8" opacity="0.4" strokeDasharray="2,2" />
+            <line x1="0" y1="0" x2="31" y2="21" stroke="#f59e0b" strokeWidth="0.6" opacity="0.3" />
+            <line x1="62" y1="0" x2="31" y2="21" stroke="#f59e0b" strokeWidth="0.6" opacity="0.3" />
 
-  return group
+            {/* Flap — V-shape on top */}
+            <polygon points="0,0 31,21 62,0" fill="#fbbf24" opacity="0.7" stroke="#d97706" strokeWidth="1.2" />
+
+            {/* Address lines (scribble) */}
+            <line x1="14" y1="29" x2="40" y2="29" stroke="#b45309" strokeWidth="1" opacity="0.4" strokeLinecap="round" />
+            <line x1="14" y1="34" x2="36" y2="34" stroke="#b45309" strokeWidth="1" opacity="0.3" strokeLinecap="round" />
+            <line x1="14" y1="39" x2="32" y2="39" stroke="#b45309" strokeWidth="1" opacity="0.2" strokeLinecap="round" />
+
+            {/* Stamp — top right corner, small rectangle */}
+            <rect x="46" y="3" width="10" height="12" rx="1" fill="#ef4444" opacity="0.65"
+              stroke="#dc2626" strokeWidth="0.8" strokeDasharray="1.5,1" />
+            <circle cx="51" cy="9" r="2.5" fill="#fecaca" opacity="0.7" />
+
+            {/* Wax seal — bottom right corner, small heart */}
+            <g transform="translate(52, 34) scale(0.55)">
+              <path d="M0,3 C0,3 -6,-3 -6,-7 C-6,-10 -3,-12 0,-9 C3,-12 6,-10 6,-7 C6,-3 0,3 0,3Z"
+                fill="#dc2626" opacity="0.8" stroke="#991b1b" strokeWidth="1" />
+            </g>
+
+            {/* Gradients */}
+            <defs>
+              <linearGradient id={gradId} x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#fef3c7" />
+                <stop offset="100%" stopColor="#fde68a" />
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+
+        {/* ── Distance badge ── */}
+        <div className="
+          mt-1.5 px-2 py-0.5
+          rounded-full
+          bg-amber-900/70 backdrop-blur-sm
+          border border-amber-500/30
+          text-[9px] font-bold font-mono
+          text-amber-200
+          shadow-sm
+          opacity-0 group-hover:opacity-100
+          transition-opacity duration-200
+          whitespace-nowrap
+        ">
+          📍 {Math.round(distance)}m
+        </div>
+
+        {/* ── Message preview (on hover) ── */}
+        <div className="
+          absolute top-full mt-8
+          max-w-[10rem] px-3 py-2
+          rounded-lg
+          bg-bg/90 backdrop-blur-md
+          border border-primary/20
+          shadow-lg
+          opacity-0 group-hover:opacity-100
+          transition-all duration-200
+          pointer-events-none
+          text-center
+        ">
+          <p className="text-[10px] text-text-primary font-serif leading-relaxed line-clamp-2">
+            {capsule.message || '时空来信'}
+          </p>
+          <div className="flex flex-wrap justify-center gap-1 mt-1.5">
+            {capsule.emotion_tags?.slice(0, 2).map((tag) => (
+              <span
+                key={tag}
+                className="text-[8px] text-primary border border-primary/15 bg-primary/5 px-1.5 py-0.5 rounded-full"
+              >
+                {tag}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </button>
+  )
 }

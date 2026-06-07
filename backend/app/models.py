@@ -143,6 +143,40 @@ class VoiceCloneResponse(BaseModel):
     voice_id: str
     audio_url: str
     duration_seconds: float
+    message: Optional[str] = None
+
+
+# ==========================================
+# AR Scene Layout model (#15)
+# ==========================================
+class ARPlacement(BaseModel):
+    anchor: str = "center"
+    x: float = 0.5
+    y: float = 0.5
+    scale: float = 0.9
+    depth_hint: str = "middle"  # near | middle | far
+
+
+class ARZone(BaseModel):
+    x: float
+    y: float
+    width: float
+    height: float
+    reason: str = ""
+
+
+class ARSceneLayoutResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
+    scene_type: str = "未知"
+    ground_visible: bool = False
+    placement: ARPlacement = ARPlacement()
+    safe_zones: list[ARZone] = []
+    avoid_zones: list[ARZone] = []
+    atmosphere: str = ""
+    blessing_copy: str = ""
+    confidence: float = 0.5
+    source: Optional[str] = None
 
 
 # ==========================================

@@ -1,12 +1,16 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCapsuleStore } from '../stores/capsuleStore'
 import type { Capsule } from '../types'
 
-export default function RecommendPanel() {
+interface RecommendPanelProps {
+  expanded: boolean
+  setExpanded: (expanded: boolean) => void
+}
+
+export default function RecommendPanel({ expanded, setExpanded }: RecommendPanelProps) {
   const navigate = useNavigate()
   const { nearby, isLoadingNearby, fetchNearby } = useCapsuleStore()
-  const [expanded, setExpanded] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {

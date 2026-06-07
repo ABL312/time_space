@@ -11,7 +11,7 @@ import ProximityAlert from '../components/ProximityAlert'
 import { useAchievements } from '../hooks/useAchievements'
 import AchievementPanel from '../components/AchievementPanel'
 import DanmakuLayer from '../components/DanmakuLayer'
-import { Card, Badge, Button, Input, BottomSheet } from '../components/ui'
+import { Card, Badge, Button, BottomSheet } from '../components/ui'
 import type { Capsule } from '../types'
 
 const MapView = lazy(() => import('../components/MapView'))
@@ -19,13 +19,16 @@ const RecommendPanel = lazy(() => import('../components/RecommendPanel'))
 
 export default function HomePage() {
   const navigate = useNavigate()
-  const { latitude, longitude, error: geoError, locationSource } = useGeolocation()
+  const { latitude, longitude, error: geoError, locationSource, requestPermission } = useGeolocation()
   const { virtualLocation, setVirtual } = useVirtualLocation()
   const { user, clearUser } = useUserStore()
   const { fetchNearby, nearby, isLoadingNearby } = useCapsuleStore()
   const cap = useCapabilityCheck()
   const { achievements } = useAchievements()
   const [isAchievementPanelOpen, setIsAchievementPanelOpen] = useState(false)
+  const [isRecommendExpanded, setIsRecommendExpanded] = useState(false)
+  const [isDanmakuVisible, setIsDanmakuVisible] = useState(true)
+  const [hasSearched, setHasSearched] = useState(false)
   
   // Daily recommendation
   const [dailyRecommendation, setDailyRecommendation] = useState<Capsule | null>(null)
@@ -38,6 +41,9 @@ export default function HomePage() {
   const [isSearching, setIsSearching] = useState(false)
   const [selectedTag, setSelectedTag] = useState<string | null>(null)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [lastSearchedQuery, setLastSearchedQuery] = useState('')
+  const [lastSelectedTag, setLastSelectedTag] = useState<string | null>(null)
+  const [isSearchFocused, setIsSearchFocused] = useState(false)
   
   const effectiveLatitude = virtualLocation?.lat ?? latitude ?? 31.0282
   const effectiveLongitude = virtualLocation?.lng ?? longitude ?? 121.4346
@@ -54,6 +60,9 @@ export default function HomePage() {
     if (!searchQuery.trim() && !selectedTag) return
     
     setIsSearching(true)
+    setHasSearched(false)
+    setLastSearchedQuery(searchQuery)
+    setLastSelectedTag(selectedTag)
     
     try {
       const params: { q?: string; tag?: string; lat?: number; lng?: number; radius?: number } = {}
@@ -67,8 +76,10 @@ export default function HomePage() {
       
       const results = await searchApi.search(params)
       setSearchResults(results.capsules)
+      setHasSearched(true)
     } catch (err: unknown) {
       console.error('Search error:', err)
+      setHasSearched(true)
     } finally {
       setIsSearching(false)
     }
@@ -77,7 +88,10 @@ export default function HomePage() {
   const clearSearch = () => {
     setSearchQuery('')
     setSelectedTag(null)
+    setLastSearchedQuery('')
+    setLastSelectedTag(null)
     setSearchResults([])
+    setHasSearched(false)
   }
 
   useEffect(() => {
@@ -97,12 +111,7 @@ export default function HomePage() {
   }, [])
 
   const handleExplore = () => {
-    if (cap.shouldSkipAR) {
-      const first = nearby?.recommended[0] || nearby?.others[0]
-      if (first) navigate(`/capsule/${first.id}`)
-    } else {
-      navigate(`/ar${window.location.search}`)
-    }
+    navigate(`/ar${window.location.search}`)
   }
 
   const formatDistance = (m: number | null | undefined) => {
@@ -124,73 +133,89 @@ export default function HomePage() {
       )}
 
       {/* Search Results */}
-      {searchResults.length > 0 && (
-        <div className="absolute inset-0 pt-28 pb-24 px-4 z-10 overflow-y-auto bg-bg/90 backdrop-blur-sm">
-          <div className="max-w-lg mx-auto space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-primary/10">
-              <h2 className="text-lg font-serif font-bold text-text-primary">搜索到 {searchResults.length} 封信件</h2>
-              <Button variant="ghost" size="sm" onClick={clearSearch} className="text-primary font-serif">返回地图</Button>
-            </div>
-            {searchResults.map((capsule) => (
-              <Card
-                key={capsule.id}
-                padding="md"
-                interactive
-                onClick={() => navigate(`/capsule/${capsule.id}`)}
-                className="border-primary/10 hover:border-primary/30 transition-colors bg-bg shadow-sm rounded-lg"
-              >
-                <div className="flex items-start gap-4">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <span className="text-sm font-serif font-bold text-text-primary truncate">
-                        {capsule.author?.name || '匿名信使'}
-                      </span>
-                      <span className="text-xs text-text-muted font-serif">
-                        📍 {formatDistance(capsule.distance_m)}
-                      </span>
-                    </div>
-                    <p className="text-sm text-text-secondary line-clamp-2 leading-relaxed font-serif">
-                      {capsule.message}
-                    </p>
-                    {capsule.emotion_tags && capsule.emotion_tags.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-3">
-                        {capsule.emotion_tags.slice(0, 3).map((tag) => (
-                          <span key={tag} className="text-[10px] font-serif text-primary border border-primary/10 bg-primary/5 px-2 py-0.5 rounded-full">{tag}</span>
-                        ))}
+      {hasSearched && (
+        <div className="absolute inset-0 z-10 flex flex-col bg-bg/95 backdrop-blur-sm">
+          {/* Header Spacer to push results below search HUD */}
+          <div className="h-32 flex-shrink-0" />
+          
+          {/* Scrollable Results List */}
+          <div className="flex-1 overflow-y-auto px-4 pb-24">
+            <div className="max-w-lg mx-auto space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-primary/10">
+                <h2 className="text-lg font-serif font-bold text-text-primary">
+                  {searchResults.length > 0 ? `搜索到 ${searchResults.length} 封信件` : '搜索结果'}
+                </h2>
+                <Button variant="ghost" size="sm" onClick={clearSearch} className="text-primary font-serif">返回地图</Button>
+              </div>
+              
+              {searchResults.length > 0 ? (
+                searchResults.map((capsule) => (
+                  <Card
+                    key={capsule.id}
+                    padding="md"
+                    interactive
+                    onClick={() => navigate(`/capsule/${capsule.id}`)}
+                    className="border-primary/10 hover:border-primary/30 transition-colors bg-bg shadow-sm rounded-lg"
+                  >
+                    <div className="flex items-start gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-sm font-serif font-bold text-text-primary truncate">
+                            {capsule.author?.name || '匿名信使'}
+                          </span>
+                          <span className="text-xs text-text-muted font-serif">
+                            📍 {formatDistance(capsule.distance_m)}
+                          </span>
+                        </div>
+                        <p className="text-sm text-text-secondary line-clamp-2 leading-relaxed font-serif">
+                          {capsule.message}
+                        </p>
+                        {capsule.emotion_tags && capsule.emotion_tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-3">
+                            {capsule.emotion_tags.slice(0, 3).map((tag) => (
+                              <span key={tag} className="text-[10px] font-serif text-primary border border-primary/10 bg-primary/5 px-2 py-0.5 rounded-full">{tag}</span>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                    )}
-                  </div>
-                  {capsule.media && capsule.media.length > 0 && (
-                    <div className="w-16 h-16 border border-primary/10 flex-shrink-0 rounded-md overflow-hidden bg-primary/5 shadow-sm">
-                      <img 
-                        src={capsule.media[0].thumbnail_url || capsule.media[0].url} 
-                        alt=""
-                        className="w-full h-full object-cover"
-                        onError={(e) => {
-                          const target = e.target as HTMLImageElement
-                          target.style.display = 'none'
-                        }}
-                      />
+                      {capsule.media && capsule.media.length > 0 && (
+                        <div className="w-16 h-16 border border-primary/10 flex-shrink-0 rounded-md overflow-hidden bg-primary/5 shadow-sm">
+                          <img 
+                            src={capsule.media[0].thumbnail_url || capsule.media[0].url} 
+                            alt=""
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement
+                              target.style.display = 'none'
+                            }}
+                          />
+                        </div>
+                      )}
                     </div>
-                  )}
-                </div>
-              </Card>
-            ))}
+                  </Card>
+                ))
+              ) : (
+                <Card padding="lg" className="text-center border-primary/10 bg-bg py-12 rounded-lg shadow-sm">
+                  <span className="text-4xl block mb-3">🔍</span>
+                  <p className="text-sm font-serif text-text-secondary">未找到与“{searchQuery}”相关的时空信件</p>
+                  <p className="text-xs text-text-muted mt-2">你可以尝试清除筛选条件，或在附近多走走</p>
+                </Card>
+              )}
+            </div>
           </div>
         </div>
       )}
 
       {/* Danmaku Layer */}
-      <DanmakuLayer />
+      <DanmakuLayer isVisible={isDanmakuVisible && !hasSearched && !searchQuery.trim() && !isSearchFocused} />
 
       {/* ── TOP FLOATING NAVIGATION HUD ── */}
-      <div className="absolute top-4 left-4 right-4 sm:right-auto sm:w-[26rem] z-[1000] space-y-2">
+      <div className="absolute top-4 left-4 right-4 lg:right-auto lg:w-[26rem] z-[1000] space-y-2">
         {/* Search bar card */}
         <Card padding="sm" className="flex items-center gap-3 bg-bg/95 border border-primary/20 shadow-md rounded-lg backdrop-blur-sm">
-          {/* Hamburger menu for mobile */}
           <button 
             onClick={() => setIsMenuOpen(true)} 
-            className="p-1 hover:bg-surface rounded-full text-primary sm:hidden cursor-pointer"
+            className="p-1 hover:bg-surface rounded-full text-primary lg:hidden cursor-pointer"
             aria-label="打开菜单"
           >
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -198,16 +223,46 @@ export default function HomePage() {
             </svg>
           </button>
           
-          <Input
+          <input
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => {
+              // Delay slightly so click events on other buttons can register before focus changes
+              setTimeout(() => setIsSearchFocused(false), 200)
+            }}
+            onChange={(e) => {
+              const val = e.target.value
+              setSearchQuery(val)
+              if (val === '' && !selectedTag) {
+                clearSearch()
+              }
+            }}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             placeholder="搜索时空信件或情感标签..."
-            className="flex-1 !border-none !bg-transparent !p-0 text-sm font-serif text-text-primary placeholder-text-muted focus:ring-0"
+            className="flex-1 min-w-0 border-none bg-transparent p-0 text-sm font-serif text-text-primary placeholder:text-text-muted focus:outline-none focus:ring-0"
           />
           
-          {searchQuery || selectedTag || searchResults.length > 0 ? (
-            <Button variant="icon" size="icon-sm" onClick={clearSearch} className="text-text-muted hover:text-primary">
+          {/* Inner Clear button (X) inside input area */}
+          {searchQuery && (
+            <button 
+              onClick={() => {
+                setSearchQuery('')
+                if (!selectedTag) {
+                  clearSearch()
+                }
+              }} 
+              className="p-1 hover:bg-surface rounded-full text-text-muted hover:text-primary cursor-pointer mr-1 transition-colors"
+              title="清除输入"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
+
+          {/* Main Action Button on the right */}
+          {hasSearched && searchQuery === lastSearchedQuery && selectedTag === lastSelectedTag ? (
+            <Button variant="icon" size="icon-sm" onClick={clearSearch} className="text-text-muted hover:text-primary" title="清除搜索结果">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -219,6 +274,7 @@ export default function HomePage() {
               onClick={handleSearch}
               disabled={isSearching || (!searchQuery.trim() && !selectedTag)}
               className="text-primary disabled:text-text-muted"
+              title="开始搜索"
             >
               {isSearching ? (
                 <span className="w-4 h-4 border-2 border-primary border-t-transparent animate-spin rounded-full" />
@@ -231,7 +287,7 @@ export default function HomePage() {
           )}
         </Card>
 
-        {/* Tag filters under search bar (shown only in search results mode) */}
+        {/* Tag filters */}
         {searchResults.length > 0 && (
           <div className="flex gap-1.5 overflow-x-auto pb-1 max-w-full no-scrollbar">
             {['怀旧', '温暖', '感恩', '浪漫', '思念', '快乐', '遗憾', '鼓励'].map((tag) => (
@@ -252,63 +308,104 @@ export default function HomePage() {
         )}
 
         {/* Unified Status Pill row */}
-        <div className="flex flex-wrap gap-1.5 items-center z-[1000]">
-          {effectiveLatitude && effectiveLongitude && (
-            <div className="px-2.5 py-1 text-[10px] font-serif rounded-full bg-bg/95 border border-primary/10 shadow-sm text-text-secondary flex items-center gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${cap.isOnline ? 'bg-data-good animate-pulse' : 'bg-data-bad'}`} />
-              <span>{effectiveLatitude.toFixed(4)}°N, {effectiveLongitude.toFixed(4)}°E</span>
-              {virtualLocation && <span className="px-1.5 py-0.2 bg-primary/10 text-primary rounded text-[9px] font-bold">漫游模式</span>}
-              {locationSource === 'ip' && <span className="px-1.5 py-0.2 bg-primary/10 text-primary rounded text-[9px] font-bold">IP定位</span>}
-              {cap.useExpandedGPS && <span className="px-1.5 py-0.2 bg-data-warn/10 text-data-warn rounded text-[9px] font-bold">定位偏弱</span>}
-            </div>
-          )}
+        {!hasSearched && (
+          <div className="flex flex-wrap gap-1.5 items-center z-[1000]">
+            {effectiveLatitude && effectiveLongitude && (
+              <div className="px-2.5 py-1 text-[10px] font-serif rounded-full bg-bg/95 border border-primary/10 shadow-sm text-text-secondary flex items-center gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${cap.isOnline ? 'bg-data-good animate-pulse' : 'bg-data-bad'}`} />
+                <span>{effectiveLatitude.toFixed(4)}°N, {effectiveLongitude.toFixed(4)}°E</span>
+                {virtualLocation && <span className="px-1.5 py-0.2 bg-primary/10 text-primary rounded text-[9px] font-bold">漫游模式</span>}
+                {locationSource === 'ip' && <span className="px-1.5 py-0.2 bg-primary/10 text-primary rounded text-[9px] font-bold">IP定位</span>}
+                {cap.useExpandedGPS && <span className="px-1.5 py-0.2 bg-data-warn/10 text-data-warn rounded text-[9px] font-bold">定位偏弱</span>}
+              </div>
+            )}
 
-          {isLoadingNearby && (
-            <div className="px-2.5 py-1 text-[10px] font-serif rounded-full bg-bg/95 border border-primary/10 shadow-sm text-primary flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 bg-primary rounded-full animate-ping" />
-              <span>正在寻信...</span>
-            </div>
-          )}
+            {locationSource === 'ip' && (
+              <button
+                onClick={requestPermission}
+                className="px-2.5 py-1 text-[10px] font-serif rounded-full bg-amber-50 border border-amber-500/30 text-amber-700 hover:bg-amber-100 shadow-sm flex items-center gap-1 cursor-pointer font-bold transition-all"
+              >
+                📍 授权 GPS 定位
+              </button>
+            )}
 
-          {!cap.isOnline && (
-            <div className="px-2.5 py-1 text-[10px] font-serif rounded-full bg-data-warn/10 border border-data-warn/25 shadow-sm text-data-warn">
-              离线模式 (显示缓存信件)
-            </div>
-          )}
+            {isLoadingNearby && (
+              <div className="px-2.5 py-1 text-[10px] font-serif rounded-full bg-bg/95 border border-primary/10 shadow-sm text-primary flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 bg-primary rounded-full animate-ping" />
+                <span>正在寻信...</span>
+              </div>
+            )}
 
-          {geoError && (
-            <div className={`px-2.5 py-1 text-[10px] font-serif rounded-full bg-bg/95 border shadow-sm flex items-center gap-1.5 ${geoError.includes('正在') ? 'border-data-warn/20 text-data-warn' : 'border-data-bad/20 text-data-bad'}`}>
-              <span className={`w-1.5 h-1.5 rounded-full ${geoError.includes('正在') ? 'bg-data-warn' : 'bg-data-bad'}`} />
-              <span>{geoError}</span>
-              {!geoError.includes('正在') && (
+            {!cap.isOnline && (
+              <div className="px-2.5 py-1 text-[10px] font-serif rounded-full bg-data-warn/10 border border-data-warn/25 shadow-sm text-data-warn">
+                离线模式 (显示缓存信件)
+              </div>
+            )}
+
+            {/* Danmaku Toggle Pill */}
+            <button
+              onClick={() => setIsDanmakuVisible(!isDanmakuVisible)}
+              className={`px-2.5 py-1 text-[10px] font-serif rounded-full border shadow-sm flex items-center gap-1 cursor-pointer transition-all ${
+                isDanmakuVisible
+                  ? 'bg-primary/10 border-primary/20 text-primary font-bold shadow-sm'
+                  : 'bg-bg/95 border-border text-text-secondary hover:text-primary hover:bg-surface'
+              }`}
+              title="开关弹幕"
+            >
+              <span>💬 弹幕 {isDanmakuVisible ? '开' : '关'}</span>
+            </button>
+
+            {geoError && (
+              <div className={`px-2.5 py-1 text-[10px] font-serif rounded-full bg-bg/95 border shadow-sm flex items-center gap-1.5 ${geoError.includes('正在') ? 'border-data-warn/20 text-data-warn' : 'border-data-bad/20 text-data-bad'}`}>
+                <span className={`w-1.5 h-1.5 rounded-full ${geoError.includes('正在') ? 'bg-data-warn' : 'bg-data-bad'}`} />
+                <span>{geoError}</span>
                 <button
-                  onClick={() => {
-                    const lat = prompt('输入纬度 (例如: 31.0282)', '31.0282')
-                    const lng = prompt('输入经度 (例如: 121.4346)', '121.4346')
-                    if (lat && lng) {
-                      setVirtual(parseFloat(lat), parseFloat(lng))
-                    }
-                  }}
-                  className="px-1 border border-primary/20 text-primary rounded text-[9px] hover:bg-primary/5 cursor-pointer"
+                  onClick={requestPermission}
+                  className="px-1 border border-primary/20 text-primary rounded text-[9px] hover:bg-primary/5 cursor-pointer font-bold ml-1 animate-pulse"
                 >
-                  手动定位
+                  重新授权
                 </button>
-              )}
-            </div>
-          )}
-        </div>
+                {!geoError.includes('正在') && (
+                  <button
+                    onClick={() => {
+                      const lat = prompt('输入纬度 (例如: 31.0282)', '31.0282')
+                      const lng = prompt('输入经度 (例如: 121.4346)', '121.4346')
+                      if (lat && lng) {
+                        setVirtual(parseFloat(lat), parseFloat(lng))
+                      }
+                    }}
+                    className="px-1 border border-primary/20 text-primary rounded text-[9px] hover:bg-primary/5 cursor-pointer"
+                  >
+                    手动定位
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* GPS Warning Card inside HUD */}
-        {locationSource === 'ip' && !dismissGPSWarning && (
-          <Card padding="sm" className="border-amber-500/20 bg-amber-500/5 flex items-start gap-2 rounded-lg max-w-sm relative z-[1000]">
-            <span className="text-sm">📍</span>
-            <div className="flex-1">
-              <p className="text-xs font-serif font-bold text-amber-700">建议开启 GPS 定位</p>
-              <p className="text-[10px] text-amber-600 font-serif mt-0.5 leading-relaxed">
+        {locationSource === 'ip' && !dismissGPSWarning && !hasSearched && (
+          <Card padding="sm" className="border-amber-500/20 bg-amber-500/5 flex items-start gap-2 rounded-lg max-w-sm relative z-[1000] shadow-sm">
+            <span className="text-sm flex-shrink-0">📍</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-serif font-bold text-amber-700">建议开启 GPS 定位</p>
+                <button
+                  onClick={requestPermission}
+                  className="text-[10px] text-primary border border-primary/20 bg-primary/5 px-2 py-0.5 rounded-full hover:bg-primary/10 cursor-pointer font-bold font-serif ml-2"
+                >
+                  去授权
+                </button>
+              </div>
+              <p className="text-[10px] text-amber-600 font-serif mt-1 leading-relaxed hidden sm:block">
                 当前正使用近似的 IP 定位。请开启手机 GPS 并使用安全的 HTTPS 连接访问，以获取精准的附近来信。
               </p>
+              <p className="text-[10px] text-amber-600 font-serif mt-0.5 leading-relaxed block sm:hidden">
+                使用 HTTPS 链接并授权定位，以获取精准的附近来信。
+              </p>
             </div>
-            <button onClick={() => setDismissGPSWarning(true)} className="text-amber-500 hover:text-amber-700 text-xs font-bold px-1 cursor-pointer">
+            <button onClick={() => setDismissGPSWarning(true)} className="text-amber-500 hover:text-amber-700 text-xs font-bold px-1 cursor-pointer flex-shrink-0">
               ×
             </button>
           </Card>
@@ -335,19 +432,12 @@ export default function HomePage() {
             <p className="text-xs text-text-secondary font-serif leading-relaxed line-clamp-2">
               “{dailyRecommendation.message}”
             </p>
-            {dailyRecommendation.emotion_tags && dailyRecommendation.emotion_tags.length > 0 && (
-              <div className="flex flex-wrap gap-1 mt-2">
-                {dailyRecommendation.emotion_tags.slice(0, 2).map((tag) => (
-                  <span key={tag} className="text-[9px] font-serif text-primary border border-primary/10 bg-primary/5 px-1.5 py-0.2 rounded">{tag}</span>
-                ))}
-              </div>
-            )}
           </Card>
         )}
       </div>
 
       {/* ── TOP-RIGHT DESKTOP ACTIONS ── */}
-      <div className="hidden sm:flex absolute top-4 right-4 z-[1000] items-center gap-3">
+      <div className="hidden lg:flex absolute top-4 right-4 z-[1000] items-center gap-3">
         <Button variant="icon" size="icon-md" onClick={() => navigate('/profile')} title="个人中心" className="hud bg-bg/95 border border-primary/20 text-primary rounded-full hover:bg-surface shadow-sm">
           <div className="w-5 h-5 flex items-center justify-center bg-primary/10 rounded-full">
             <span className="text-xs font-bold text-primary font-serif">
@@ -372,55 +462,50 @@ export default function HomePage() {
         </Button>
       </div>
 
-      {/* ── FLOATING ACTION BUTTONS (Lower-middle-right to avoid overlaps) ── */}
-      <div className="absolute right-4 bottom-32 sm:bottom-28 z-[1001] flex flex-col gap-3">
-        {/* AR Explore Button */}
-        <Button
-          variant="icon"
-          size="icon-lg"
-          onClick={handleExplore}
-          className="bg-primary hover:bg-primary-dark border border-primary/20 text-white rounded-full shadow-lg flex items-center justify-center w-12 h-12 transition-transform active:scale-95"
-          title={cap.shouldSkipAR ? '寻找信件' : '开启AR空间'}
-        >
-          {cap.shouldSkipAR ? (
-            <span className="text-xl">📁</span>
-          ) : (
+      {/* ── FLOATING ACTION BUTTONS (Hidden when drawer is expanded or search results active) ── */}
+      {!isRecommendExpanded && !hasSearched && (
+        <div className="absolute right-4 bottom-32 sm:bottom-28 z-[1001] flex flex-col gap-3">
+          <Button
+            variant="icon"
+            size="icon-lg"
+            onClick={handleExplore}
+            className="bg-primary hover:bg-primary-dark border border-primary/20 text-white rounded-full shadow-lg flex items-center justify-center w-12 h-12 transition-transform active:scale-95"
+            title="空间寻信 (AR)"
+          >
             <span className="text-xl">👁️</span>
-          )}
-        </Button>
-        
-        {/* Create Capsule Button */}
-        <Button
-          variant="icon"
-          size="icon-lg"
-          onClick={() => navigate('/create')}
-          className="bg-capsule hover:bg-capsule-dim border border-capsule/20 text-white rounded-full shadow-lg flex items-center justify-center w-12 h-12 transition-transform active:scale-95"
-          title="写信留念"
-        >
-          <span className="text-xl">✍️</span>
-        </Button>
-        
-        {/* Roaming Mode Button */}
-        <Button
-          variant="icon"
-          size="icon-lg"
-          onClick={() => {
-            const lat = prompt('输入纬度 (例如: 31.0282)', '31.0282')
-            const lng = prompt('输入经度 (例如: 121.4346)', '121.4346')
-            if (lat && lng) {
-              setVirtual(parseFloat(lat), parseFloat(lng))
-            }
-          }}
-          className="bg-surface hover:bg-surface-light border border-primary/20 text-primary rounded-full shadow-lg flex items-center justify-center w-12 h-12 transition-transform active:scale-95"
-          title="漫游模拟定位"
-        >
-          <span className="text-xl">🧭</span>
-        </Button>
-      </div>
+          </Button>
+          
+          <Button
+            variant="icon"
+            size="icon-lg"
+            onClick={() => navigate('/create')}
+            className="bg-capsule hover:bg-capsule-dim border border-capsule/20 text-white rounded-full shadow-lg flex items-center justify-center w-12 h-12 transition-transform active:scale-95"
+            title="写信留念"
+          >
+            <span className="text-xl">✍️</span>
+          </Button>
+          
+          <Button
+            variant="icon"
+            size="icon-lg"
+            onClick={() => {
+              const lat = prompt('输入纬度 (例如: 31.0282)', '31.0282')
+              const lng = prompt('输入经度 (例如: 121.4346)', '121.4346')
+              if (lat && lng) {
+                setVirtual(parseFloat(lat), parseFloat(lng))
+              }
+            }}
+            className="bg-surface hover:bg-surface-light border border-primary/20 text-primary rounded-full shadow-lg flex items-center justify-center w-12 h-12 transition-transform active:scale-95"
+            title="漫游模拟定位"
+          >
+            <span className="text-xl">🧭</span>
+          </Button>
+        </div>
+      )}
 
       {/* ── RECOMMEND PANEL ── */}
       <Suspense fallback={null}>
-        <RecommendPanel />
+        <RecommendPanel expanded={isRecommendExpanded} setExpanded={setIsRecommendExpanded} />
       </Suspense>
       
       {/* ── PROXIMITY ALERT ── */}
@@ -449,7 +534,7 @@ export default function HomePage() {
             { label: '我的收藏', path: '/favorites', color: 'text-primary', icon: '❤️' },
             { label: '时光勋章', action: () => { setIsMenuOpen(false); setIsAchievementPanelOpen(true) }, color: 'text-primary', icon: '🏅' },
             { label: '我的信箱', path: '/mine', color: 'text-primary', icon: '✉️' },
-            { label: cap.shouldSkipAR ? '寻找信件' : '开启AR空间', action: () => { setIsMenuOpen(false); handleExplore() }, color: 'text-primary', icon: cap.shouldSkipAR ? '📁' : '👁️' },
+            { label: '空间寻信 (AR)', action: () => { setIsMenuOpen(false); handleExplore() }, color: 'text-primary', icon: '👁️' },
             { label: '写信留念', path: '/create', color: 'text-primary', icon: '✍️' },
           ].map((item) => (
             <button

@@ -206,7 +206,28 @@ export function useGeolocation(options: UseGeolocationOptions = {}) {
     }
   }, [enableHighAccuracy, timeout, maximumAge, watch, onSuccess, onError, triggerIPFallback])
 
-  return state
+  const requestPermission = useCallback(() => {
+    if (!navigator.geolocation) {
+      setState((prev) => ({ ...prev, error: '当前浏览器不支持 GPS 定位' }))
+      return
+    }
+    setState((prev) => ({ ...prev, error: '正在请求位置权限...' }))
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        onSuccess(position)
+      },
+      (error) => {
+        onError(error)
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 0
+      }
+    )
+  }, [onSuccess, onError])
+
+  return { ...state, requestPermission }
 }
 
 /**

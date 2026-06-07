@@ -13,10 +13,12 @@ from ..models import (
     SceneResponse,
     LocationContextResponse,
     VoiceCloneResponse,
+    ARSceneLayoutResponse,
 )
 from ..services.emotion_service import emotion_service
 from ..services.location_service import LocationService
 from ..services.scene_service import SceneService
+from ..services.ar_scene_service import ARSceneService
 from ..database import get_db
 from ..services.geohash_service import find_nearby_capsules
 
@@ -25,10 +27,11 @@ router = APIRouter(prefix="/api/ai", tags=["ai"])
 # Initialize services
 location_service = LocationService()
 scene_service = SceneService()
+ar_scene_service = ARSceneService()
 
 # Check for API keys
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
-ELEVENLABS_API_KEY = os.getenv("ELEVENLABS_API_KEY", "")
+FISH_AUDIO_API_KEY = os.getenv("FISH_AUDIO_API_KEY", "")
 
 
 @router.post("/analyze-emotion", response_model=EmotionAnalysisResponse)
@@ -118,3 +121,35 @@ async def voice_clone(
     result = await voice_service.clone_and_speak(sample_content, sample_filename, text)
     
     return VoiceCloneResponse(**result)
+
+
+@router.post("/ar-scene-layout", response_model=ARSceneLayoutResponse)
+async def get_ar_scene_layout(
+    image: UploadFile = File(...),
+    latitude: Optional[float] = Form(None),
+    longitude: Optional[float] = Form(None),
+    capsule_count: int = Form(0),
+):
+    """
+    Analyse camera frame for optimal AR card placement.  (#15)
+
+    Sends the image to GPT-4o Vision (if OPENAI_API_KEY is configured)
+    and returns the scene type, visible ground, and recommended placement
+    coordinates (0-1 normalised).  Falls back to rule-based defaults when
+    the AI path is unavailable.
+    """
+    try:
+        content = await image.read()
+        result = await ar_scene_service.analyse(
+            content,
+            lat=latitude,
+            lng=longitude,
+            capsule_count=capsule_count,
+        )
+        return ARSceneLayoutResponse(**result)
+    except Exception as e:
+        print(f"⚠️ AR scene layout error: {e}")
+
+        # Last-resort fallback so the frontend always gets a valid layout
+        fallback = ar_scene_service._fallback_layout(capsule_count)
+        return ARSceneLayoutResponse(**fallback)

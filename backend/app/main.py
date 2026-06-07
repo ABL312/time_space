@@ -47,6 +47,7 @@ app = FastAPI(
     description="Time-Space Mailbox - AR Geolocation Messaging Platform",
     version="1.0.0",
     lifespan=lifespan,
+    redirect_slashes=False,
 )
 
 # ==========================================
@@ -64,10 +65,9 @@ async def utf8_encoding_middleware(request, call_next):
 # ==========================================
 # CORS Configuration
 # ==========================================
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origin_regex=r"https?://.*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

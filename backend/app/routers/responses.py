@@ -15,7 +15,7 @@ from ..auth import get_current_user
 
 router = APIRouter(prefix="/api/capsules/{capsule_id}/responses", tags=["responses"])
 
-@router.post("/", response_model=ResponseModel, summary="Add a response to a capsule")
+@router.post("", response_model=ResponseModel, summary="Add a response to a capsule")
 async def add_response(
     capsule_id: str,
     response_data: ResponseCreateModel,
@@ -67,7 +67,7 @@ async def add_response(
     
     raise HTTPException(status_code=500, detail="Failed to create response")
 
-@router.get("/", response_model=List[ResponseModel], summary="Get all responses for a capsule")
+@router.get("", response_model=List[ResponseModel], summary="Get all responses for a capsule")
 async def get_responses(
     capsule_id: str,
     db: aiosqlite.Connection = Depends(get_db)
